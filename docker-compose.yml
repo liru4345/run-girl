@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:14
+    env_file: ./server/.env
+    expose:
+      - '5432'
+    volumes:
+      - run-girl-db:/var/lib/postgresql/data
+      - ./init_data:/docker-entrypoint-initdb.d
+
+  server:
+    build: ./server
+    working_dir: /home/node/app
+    user: 'node'
+    env_file: ./server/.env
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - db
+    ports:
+      - '5001:5001'
+    volumes:
+      - ./server:/home/node/app
+      #- /home/node/app/node_modules  # this keeps the container's node_modules
+    command: 'npm start'
+
+
+  client:
+    image: node:lts
+    working_dir: /home/node/app
+    user: 'node'
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./client:/home/node/app
+    command: 'npm start'
+    depends_on:
+      - server
+
+volumes:
+  run-girl-db:
