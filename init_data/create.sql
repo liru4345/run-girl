@@ -6,7 +6,7 @@ CREATE TABLE  IF NOT EXISTS users (
   last_name VARCHAR(50),
   email VARCHAR(100) NOT NULL,
   password TEXT NOT NULL,
-  phone_number VARCHAR(15) UNIQUE NOT NULL,
+  phone_number VARCHAR(15) NOT NULL, --removed unique for testing
   profile_picture TEXT,
   bio TEXT,
   followers_count INTEGER ,
@@ -27,13 +27,17 @@ CREATE TABLE  IF NOT EXISTS friends (
 );
 
 -- POSTS table (posts made by users)
-CREATE TABLE  IF NOT EXISTS posts (
+CREATE TABLE IF NOT EXISTS posts (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL,
-  content TEXT,
-  image TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_post_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content TEXT,                            -- Optional: general text or recap
+  image TEXT,                              -- Run photo (stored as URL/path)
+  miles NUMERIC(5, 2),                     -- e.g., 5.20 miles
+  duration_seconds INTEGER,               -- Actual run duration
+  location TEXT,
+  visibility VARCHAR(10) DEFAULT 'private', -- 'private' or 'public'
+  pace_seconds_per_mile FLOAT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- COMMENTS table (comments on posts)

@@ -66,31 +66,28 @@ const Notifications = () => {
         <div>
           {general.map((notif) => (
             <div
-              key={notif.id}
-              className="card notification-card mb-2 p-3 d-flex justify-content-between align-items-center"
-            >
-              {/* Left side: user info and message */}
-              <div className="d-flex align-items-center">
-                <img
-                  src={notif.profile_icon || 'https://via.placeholder.com/40'}
-                  alt="profile"
-                  className="me-3 rounded-circle"
-                  width={40}
-                  height={40}
-                />
-                <div>
-                  <strong>{notif.sender_username}</strong> {notif.message}
-                  <br />
-                  <small className="text-muted">{notif.created_at}</small>
-                </div>
+            key={notif.id}
+            className="card notification-card mb-2 p-3 position-relative"
+          >
+            <div className="d-flex">
+              <img
+                src={notif.profile_icon || 'https://via.placeholder.com/40'}
+                alt="profile"
+                className="me-3 rounded-circle"
+                width={40}
+                height={40}
+              />
+              <div className="flex-grow-1 text-start">
+                <strong>{notif.sender_username}</strong> {notif.message}
+                <br />
+                <small className="text-muted">{notif.created_at}</small>
               </div>
-
-              {/* Right side: dismiss button */}
-              <button
-                className="btn-close position-absolute top-0 end-0 m-2"
-                onClick={() => dismissNotification(notif.id)}
-              ></button>
             </div>
+            <button
+              className="btn-close position-absolute top-0 end-0 m-2"
+              onClick={() => dismissNotification(notif.id)}
+            ></button>
+          </div>
           ))}
 
         </div>
@@ -105,7 +102,7 @@ const Notifications = () => {
                 {/* Left side: profile and text */}
                 <div className="d-flex align-items-center">
                   <img
-                    src={req.profile_pic || 'https://via.placeholder.com/40'}
+                    src={req.profile_icon || 'https://via.placeholder.com/40'}
                     alt="profile"
                     className="me-3 rounded-circle"
                     width={40}

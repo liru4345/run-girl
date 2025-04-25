@@ -23,6 +23,7 @@ services:
       - '5001:5001'
     volumes:
       - ./server:/home/node/app
+      - ./uploads:/home/node/app/uploads
       #- /home/node/app/node_modules  # this keeps the container's node_modules
     command: 'npm start'
 

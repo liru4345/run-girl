@@ -2,8 +2,10 @@
 // <!-- Section 1 : Import Dependencies -->
 // *****************************************************
 const express = require('express');
-const app = express();
+const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+const app = express();
 const pgp = require('pg-promise')();
 const bodyParser = require('body-parser');
 const session = require('express-session');
@@ -24,6 +26,16 @@ const dbConfig = {
   password: process.env.POSTGRES_PASSWORD,
 };
 const db = pgp(dbConfig);
+
+const nodemailer = require('nodemailer');
+
+const transporter = nodemailer.createTransport({
+  service: 'gmail', // Or any email provider
+  auth: {
+    user: process.env.EMAIL_USER, // Add to your .env
+    pass: process.env.EMAIL_PASS, // App password or real password
+  },
+});
 
 
 
@@ -69,6 +81,8 @@ app.use(
     resave: false,
   })
 );
+
+
 
 // *****************************************************
 // <!-- Section 4 : API Routes -->
@@ -134,20 +148,27 @@ app.post('/api/login', async (req, res) => {
 
 
 app.get('/api/profile', async (req, res) => {
-  if (!req.session.user) return res.status(401).send({ error: 'Unauthorized' });
+  const user = req.session.user;
+
+  if (!user) return res.status(401).send({ error: 'Unauthorized' });
 
   try {
-    const user = await db.one(`
-      SELECT id, first_name, last_name, email, profile_picture, bio, followers_count, following_count
-      FROM users WHERE id = $1
-    `, [req.session.user.id]);
+    const [followersCount, followingCount] = await Promise.all([
+      db.one(`SELECT COUNT(*) FROM friends WHERE friend_id = $1 AND status = 'following'`, [user.id]),
+      db.one(`SELECT COUNT(*) FROM friends WHERE user_id = $1 AND status = 'following'`, [user.id])
+    ]);
 
-    res.status(200).send(user);
+    res.status(200).send({
+      ...user,
+      followers_count: parseInt(followersCount.count),
+      following_count: parseInt(followingCount.count)
+    });
   } catch (err) {
-    console.error("❌ Error loading profile:", err);
-    res.status(500).send({ error: 'Profile fetch failed' });
+    console.error('❌ Error loading profile with counts:', err);
+    res.status(500).send({ error: 'Failed to load profile data' });
   }
 });
+
 
 
 app.get('/api/logout', (req, res) => {
@@ -453,6 +474,7 @@ app.get('/api/start-run', async (req, res) => {
   }
 });
 
+/*
 app.post('/api/start-run', async (req, res) => {
   console.log("📥 Received run:", req.body); // Add this line
   const userId = req.session.user?.id;
@@ -489,7 +511,347 @@ app.post('/api/start-run', async (req, res) => {
     res.status(500).json({ error: 'Something went wrong when starting the run' });
   }
 });
+*/
+// Helper: Get carrier gateway domain
+function getCarrierGateway(carrier) {
+  const gateways = {
+    'att': 'txt.att.net',
+    'verizon': 'vtext.com',
+    'tmobile': 'tmomail.net',
+    'sprint': 'messaging.sprintpcs.com'
+    // Add more carriers if needed
+  };
+  return gateways[carrier.toLowerCase()] || 'txt.att.net';  // Default to AT&T if unknown
+}
 
+app.post('/api/start-run', async (req, res) => {
+  console.log("📥 Received run:", req.body);
+  const userId = req.session.user?.id;
+  const { duration_minutes, location, watcher_ids } = req.body;
+  const startTime = new Date();
+  const endTime = new Date(startTime.getTime() + duration_minutes * 60000);
+
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    // Step 1: Insert the run and return the ID
+    const run = await db.one(`
+      INSERT INTO runs (user_id, location, duration_minutes, start_time, end_time)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id
+    `, [userId, location, duration_minutes, startTime, endTime]);
+
+    const runId = run.id;
+
+    // Step 2: Insert watchers into the run_watchers table
+    const inserts = watcher_ids.map(watcherId =>
+      db.none(`INSERT INTO run_watchers (run_id, watcher_id) VALUES ($1, $2)`, [runId, watcherId])
+    );
+    await Promise.all(inserts);
+
+    // Step 3: Fetch watcher phone numbers 
+    const watchers = await db.any(`
+      SELECT u.first_name, u.phone_number
+      FROM users u
+      WHERE u.id IN ($1:csv)
+    `, [watcher_ids]);
+
+    // Step 4: Fetch runner info
+    const runner = await db.one(`SELECT first_name, last_name FROM users WHERE id = $1`, [userId]);
+
+    // Step 5: Send SMS (via email) to each watcher
+    for (const watcher of watchers) {
+      //const carrierGateway = getCarrierGateway(watcher.carrier);
+      const carrierGateway = 'txt.att.net'; // All go to AT&T for testing
+      const phoneDigitsOnly = watcher.phone_number.replace(/[^0-9]/g, '');
+      const smsAddress = `${phoneDigitsOnly}@${carrierGateway}`;
+
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: smsAddress,
+        subject: '', // SMS doesn't need a subject
+        text: ` ${runner.first_name} ${runner.last_name} just started a run at ${location}, and should be gone for around ${duration_minutes} minutes!`
+      };
+
+      await transporter.sendMail(mailOptions);
+      console.log(`📤 Sent SMS to ${watcher.first_name} (${smsAddress})`);
+    }
+
+    res.status(201).json({ message: 'Run started and watchers notified!', runId });
+  } catch (err) {
+    console.error('❌ Error starting run:', err);
+    res.status(500).json({ error: 'Something went wrong when starting the run' });
+  }
+});
+
+// *****************************************************
+// <!-- End Run and making posts -->
+// *****************************************************
+// Backend: Add a POST endpoint to create a new post with run recap
+
+
+// Get public or private posts
+app.get('/api/posts/:visibility', async (req, res) => {
+  const userId = req.session.user?.id;
+  const { visibility } = req.params;
+
+  if (!userId || !['public', 'private'].includes(visibility)) {
+    return res.status(400).json({ error: 'Invalid request' });
+  }
+
+  try {
+    const posts = await db.any(
+      `SELECT * FROM posts WHERE user_id = $1 AND visibility = $2 ORDER BY created_at DESC`,
+      [userId, visibility]
+    );
+    res.json(posts);
+  } catch (err) {
+    console.error('Error fetching posts:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get posts for a specific user (only public)
+// Get public posts for a specific user
+app.get('/api/posts/user/:id', async (req, res) => {
+  const profileUserId = parseInt(req.params.id);
+
+  if (isNaN(profileUserId)) {
+    return res.status(400).json({ error: 'Invalid user ID' });
+  }
+
+  try {
+    const posts = await db.any(
+      `SELECT * FROM posts 
+       WHERE user_id = $1 
+       AND visibility = 'public' 
+       ORDER BY created_at DESC`,
+      [profileUserId]
+    );
+
+    res.json(posts);
+  } catch (err) {
+    console.error('Error fetching public posts:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Create uploads directory if needed
+
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
+
+// Set up multer storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, 'uploads/'),
+  filename: (req, file, cb) => {
+    const uniqueName = Date.now() + '-' + file.originalname;
+    cb(null, uniqueName);
+  },
+});
+const upload = multer({ storage });
+
+// Handle form submission with file
+app.post('/api/runs/finish', upload.single('photo'), async (req, res) => {
+  const userId = req.session.user?.id;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const {
+    location,
+    duration_seconds,
+    miles,
+    description,
+    action // "post" or "save"
+  } = req.body;
+
+  const visibility = action === 'post' ? 'public' : 'private';
+  const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
+  const pace = miles && duration_seconds ? duration_seconds / miles : null;
+  try {
+    await db.none(
+      `INSERT INTO posts (user_id, content, image, miles, duration_seconds, location, visibility, pace_seconds_per_mile)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [userId, description, imagePath, miles, duration_seconds, location, visibility, pace]
+    );
+
+    // Fetch watchers' phone numbers and carriers for the most recent run
+    const watchers = await db.any(`
+      SELECT u.first_name, u.phone_number
+      FROM run_watchers rw
+      JOIN runs r ON rw.run_id = r.id
+      JOIN users u ON rw.watcher_id = u.id
+      WHERE r.user_id = $1
+      ORDER BY r.start_time DESC LIMIT 1
+    `, [userId]);
+
+    // Send SMS via email for each watcher
+    for (const watcher of watchers) {
+      //const carrierGateway = getCarrierGateway(watcher.carrier);
+      const carrierGateway = 'txt.att.net'; // All go to AT&T for testing
+      const phoneDigitsOnly = watcher.phone_number.replace(/[^0-9]/g, '');
+      const smsAddress = `${phoneDigitsOnly}@${carrierGateway}`;
+
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: smsAddress,
+        subject: '', // Empty subject for SMS
+        text: `${req.session.user.first_name} just safely finished their run at ${location}!`
+      };
+
+      await transporter.sendMail(mailOptions);
+      console.log(`📤 Sent finish SMS to ${watcher.first_name}`);
+    }
+    res.status(201).json({ message: '✅ Run recap saved successfully!' });
+  } catch (err) {
+    console.error('❌ Error saving run recap:', err);
+    res.status(500).json({ error: 'Failed to save run recap' });
+  }
+});
+
+// Profile update endpoint
+app.post('/api/profile/update', upload.single('profile_picture'), async (req, res) => {
+  const userId = req.session.user?.id;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { first_name, last_name, email, phone_number, bio } = req.body;
+  const profile_picture = req.file ? `/uploads/${req.file.filename}` : null;
+
+  try {
+    // Update query (only update profile_picture if a new one is uploaded)
+    const updateFields = [
+      'first_name = $1',
+      'last_name = $2',
+      'email = $3',
+      'phone_number = $4',
+      'bio = $5'
+    ];
+    const updateValues = [first_name, last_name, email, phone_number, bio];
+
+    if (profile_picture) {
+      updateFields.push('profile_picture = $6');
+      updateValues.push(profile_picture);
+    }
+
+    await db.none(
+      `UPDATE users SET ${updateFields.join(', ')} WHERE id = $${updateValues.length + 1}`,
+      [...updateValues, userId]
+    );
+
+    // Fetch updated user info + follower/following counts
+    const updatedUser = await db.one(`
+      SELECT 
+        u.id, u.email, u.first_name, u.last_name, u.profile_picture, u.bio,
+        (SELECT COUNT(*) FROM friends WHERE friend_id = u.id AND status = 'following') AS followers_count,
+        (SELECT COUNT(*) FROM friends WHERE user_id = u.id AND status = 'following') AS following_count
+      FROM users u
+      WHERE u.id = $1
+    `, [userId]);
+
+    // Update session
+    req.session.user = {
+      id: updatedUser.id,
+      email: updatedUser.email,
+      first_name: updatedUser.first_name,
+      last_name: updatedUser.last_name,
+      profile_picture: updatedUser.profile_picture,
+      bio: updatedUser.bio,
+      followers_count: parseInt(updatedUser.followers_count),
+      following_count: parseInt(updatedUser.following_count)
+    };
+
+    res.status(200).json({ message: 'Profile updated successfully', user: req.session.user });
+  } catch (err) {
+    console.error('❌ Error updating profile:', err);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+// Get public profile info for any user by ID
+app.get('/api/users/:id', async (req, res) => {
+  const userId = parseInt(req.params.id);
+  const loggedInUserId = req.session.user?.id;
+
+  if (isNaN(userId)) {
+    return res.status(400).json({ error: 'Invalid user ID' });
+  }
+
+  try {
+    const user = await db.oneOrNone(
+      `SELECT id, first_name, last_name, bio, profile_picture 
+       FROM users 
+       WHERE id = $1`,
+      [userId]
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Optional: add followers/following counts for display
+    const [followersCount, followingCount] = await Promise.all([
+      db.one(`SELECT COUNT(*) FROM friends WHERE friend_id = $1 AND status = 'following'`, [userId]),
+      db.one(`SELECT COUNT(*) FROM friends WHERE user_id = $1 AND status = 'following'`, [userId]),
+    ]);
+
+     // 🔥 Add friendship status (between logged-in user and this profile user)
+     let status = 'none';
+     if (loggedInUserId && loggedInUserId != userId) {
+       const relation = await db.oneOrNone(`
+         SELECT status FROM friends 
+         WHERE user_id = $1 AND friend_id = $2
+       `, [loggedInUserId, userId]);
+ 
+       if (relation) status = relation.status; // e.g., 'requested' or 'following'
+     }
+ 
+
+    res.json({
+      ...user,
+      followers_count: parseInt(followersCount.count),
+      following_count: parseInt(followingCount.count),
+      status,
+    });
+  } catch (err) {
+    console.error('❌ Error fetching user profile:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
+
+// *****************************************************
+// <!-- Friend Feed -->
+// *****************************************************
+
+app.get('/api/feed', async (req, res) => {
+  const userId = req.session.user?.id;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const posts = await db.any(`
+      SELECT 
+        posts.*, 
+        users.first_name, 
+        users.last_name, 
+        users.profile_picture
+      FROM posts
+      JOIN users ON posts.user_id = users.id
+      WHERE posts.visibility = 'public' 
+        AND posts.user_id IN (
+          SELECT friend_id FROM friends WHERE user_id = $1 AND status = 'following'
+        )
+      ORDER BY posts.created_at DESC
+    `, [userId]);
+
+    res.json(posts);
+  } catch (err) {
+    console.error('❌ Error fetching feed:', err);
+    res.status(500).json({ error: 'Failed to fetch feed' });
+  }
+});
 
 
 

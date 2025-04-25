@@ -12,6 +12,8 @@ import Profile from "./pages/profile";
 import Friends from "./pages/friends";
 import Notifications from "./pages/notifications";
 import StartRun from "./pages/startRun";
+import UserPosts from "./pages/userPosts";
+import Feed from "./pages/feed";
 
 import "./App.css";
 
@@ -28,9 +30,13 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/profile/:id" element={<Profile />} /> {/* Add this */}
           <Route path="/friends" element={<Friends />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/start-run" element={<StartRun/>} />
+          <Route path="/posts" element={<UserPosts/>} />
+          <Route path="/posts/:id" element={<UserPosts/>} />
+          <Route path="/feed" element={<Feed/>} />
         </Routes>
       </div>
       <Footer />

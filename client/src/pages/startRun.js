@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaRunning } from 'react-icons/fa';
+import 'animate.css';
 
 const StartRun = () => {
   const [friends, setFriends] = useState([]);
@@ -9,6 +10,10 @@ const StartRun = () => {
   const [status, setStatus] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [secondsElapsed, setSecondsElapsed] = useState(0);
+  const [showRecap, setShowRecap] = useState(false);
+  const [miles, setMiles] = useState('');
+  const [description, setDescription] = useState('');
+  const [photo, setPhoto] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -24,16 +29,14 @@ const StartRun = () => {
         console.error('❌ API error:', err);
       }
     };
-
     fetchData();
   }, []);
 
-  // Timer effect
   useEffect(() => {
     let timer;
     if (isRunning) {
       timer = setInterval(() => {
-        setSecondsElapsed(prev => prev + 1);
+        setSecondsElapsed((prev) => prev + 1);
       }, 1000);
     }
     return () => clearInterval(timer);
@@ -54,7 +57,7 @@ const StartRun = () => {
         body: JSON.stringify({
           location,
           duration_minutes: runTime,
-          watcher_ids: selectedFriends
+          watcher_ids: selectedFriends,
         }),
       });
 
@@ -74,7 +77,36 @@ const StartRun = () => {
 
   const handleFinishRun = () => {
     setIsRunning(false);
-    setStatus('🎉 Run completed!');
+    setShowRecap(true);
+    setStatus('');
+  };
+
+  const handleSubmitRecap = async (action) => {
+    const formData = new FormData();
+    formData.append('location', location);
+    formData.append('duration_seconds', secondsElapsed);
+    formData.append('miles', miles);
+    formData.append('description', description);
+    formData.append('action', action);
+    if (photo) formData.append('photo', photo);
+
+    try {
+      const res = await fetch('/api/runs/finish', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('✅ Run saved!');
+        setShowRecap(false);
+        setSecondsElapsed(0);
+      } else {
+        alert('❌ Failed to save run');
+      }
+    } catch (err) {
+      console.error('Error saving run:', err);
+    }
   };
 
   const formatTime = () => {
@@ -149,7 +181,53 @@ const StartRun = () => {
             </div>
           )}
 
-          {status && <p className="mt-3">{status}</p>}
+          {status && <p className="mt-3 text-center">{status}</p>}
+          {showRecap && (
+            <div className="mt-4">
+              <h5>🏁 Run Recap</h5>
+              <p><strong>Location:</strong> {location}</p>
+              <p><strong>Duration:</strong> {formatTime()}</p>
+
+              <div className="mb-3">
+                <label className="form-label">Miles Ran</label>
+                <input
+                  type="number"
+                  className="form-control"
+                  value={miles}
+                  onChange={(e) => setMiles(e.target.value)}
+                  placeholder="e.g. 3.5"
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label">Run Description</label>
+                <textarea
+                  className="form-control"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="How did your run go?"
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label">Photo (optional)</label>
+                <input
+                  type="file"
+                  className="form-control"
+                  onChange={(e) => setPhoto(e.target.files[0])}
+                />
+              </div>
+
+              <div className="d-flex gap-2">
+                <button className="btn btn-success" onClick={() => handleSubmitRecap('post')}>
+                  📢 Post Run
+                </button>
+                <button className="btn btn-secondary" onClick={() => handleSubmitRecap('save')}>
+                  💾 Save Only
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

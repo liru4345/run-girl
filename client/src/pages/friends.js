@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
+import { Link } from 'react-router-dom';
+
 
 function Friends() {
   const [searchTerm, setSearchTerm] = useState("");
   const [results, setResults] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [pendingCancelId, setPendingCancelId] = useState(null);
+  
 
   const handleSearch = useCallback(async () => {
     try {
@@ -85,46 +88,47 @@ function Friends() {
           </div>
 
           <ul className="list-group">
-            {results.map((user) => {
-              console.log("👤 User Rendered:", user);
-              return (
-                <li
-                  key={user.id}
-                  className="list-group-item d-flex justify-content-between align-items-center"
-                >
-                  <div>
-                    <h5 className="mb-1">{user.name}</h5>
-                    <small className="text-muted">{user.phone}</small>
-                  </div>
-                  <div>
-                    {user.status === "none" && (
-                      <button
-                        className="btn btn-success btn-sm"
-                        onClick={() => handleAction(user.id, "request")}
-                      >
-                        Follow
-                      </button>
-                    )}
-                    {user.status === "requested" && (
-                      <button
-                        className="btn btn-warning btn-sm"
-                        onClick={() => confirmCancel(user.id)}
-                      >
-                        Requested
-                      </button>
-                    )}
-                    {user.status === "following" && (
-                      <button
-                        className="btn btn-outline-danger btn-sm"
-                        onClick={() => handleAction(user.id, "unfollow")}
-                      >
-                        Unfollow
-                      </button>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
+            {results.map((user) => (
+              <li
+                key={user.id}
+                className="list-group-item d-flex justify-content-between align-items-center"
+              >
+                <div>
+                  <h5 className="mb-1">
+                    <Link to={`/profile/${user.id}`} className="text-decoration-none">
+                      {user.name}
+                    </Link>
+                  </h5>
+                  <small className="text-muted">{user.phone}</small>
+                </div>
+                <div>
+                  {user.status === "none" && (
+                    <button
+                      className="btn btn-success btn-sm"
+                      onClick={() => handleAction(user.id, "request")}
+                    >
+                      Follow
+                    </button>
+                  )}
+                  {user.status === "requested" && (
+                    <button
+                      className="btn btn-warning btn-sm"
+                      onClick={() => confirmCancel(user.id)}
+                    >
+                      Requested
+                    </button>
+                  )}
+                  {user.status === "following" && (
+                    <button
+                      className="btn btn-outline-danger btn-sm"
+                      onClick={() => handleAction(user.id, "unfollow")}
+                    >
+                      Unfollow
+                    </button>
+                  )}
+                </div>
+              </li>
+            ))}
           </ul>
         </div>
       </div>
