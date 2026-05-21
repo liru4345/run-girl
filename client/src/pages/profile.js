@@ -160,7 +160,7 @@ const Profile = () => {
               ) : (
                 <>
                   <button className="btn btn-outline-primary" onClick={() => setShowEditModal(true)}>Edit Profile</button>
-                  <button className="btn btn-outline-secondary">Settings</button>
+                  <button className="btn btn-outline-secondary" onClick={() => navigate('/calender')}>Calender</button>
                   <button className="btn btn-outline-success" onClick={() => navigate('/posts')}>📸 View Posts</button>
                 </>
               )}

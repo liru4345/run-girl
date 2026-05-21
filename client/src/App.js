@@ -14,6 +14,9 @@ import Notifications from "./pages/notifications";
 import StartRun from "./pages/startRun";
 import UserPosts from "./pages/userPosts";
 import Feed from "./pages/feed";
+import Calender from "./pages/calender";
+
+
 
 import "./App.css";
 
@@ -37,6 +40,7 @@ function App() {
           <Route path="/posts" element={<UserPosts/>} />
           <Route path="/posts/:id" element={<UserPosts/>} />
           <Route path="/feed" element={<Feed/>} />
+          <Route path="/calender" element={<Calender/>} />
         </Routes>
       </div>
       <Footer />

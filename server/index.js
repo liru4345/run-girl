@@ -120,6 +120,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
+/*
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -143,6 +144,35 @@ app.post('/api/login', async (req, res) => {
     }
   } catch (err) {
     res.status(500).send({ error: 'Login failed' });
+  }
+});
+*/
+
+app.post('/api/login', async (req, res) => {
+  try {
+    const emailNorm = req.body.email.trim().toLowerCase();
+    const { password } = req.body;
+
+    const user = await db.oneOrNone('SELECT * FROM users WHERE email = $1', [emailNorm]);
+    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) return res.status(401).json({ error: 'Invalid credentials' });
+
+    req.session.user = {
+      id: user.id,
+      email: user.email,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      profile_picture: user.profile_picture,
+      bio: user.bio
+    };
+    console.log('✅ Session set:', req.session.user);
+
+    res.status(200).json({ message: 'Login successful' });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Login failed' });
   }
 });
 
@@ -854,6 +884,86 @@ app.get('/api/feed', async (req, res) => {
 });
 
 
+// *****************************************************
+// <!-- Calender Creation-->
+// *****************************************************
+
+app.get('/api/calender', async (req, res) => {
+  const me = req.session.user?.id;
+  if (!me) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const { from, to } = req.query;
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    const fromISO = from ? new Date(from).toISOString() : monthStart.toISOString();
+    const toISO   = to   ? new Date(to).toISOString()   : monthEnd.toISOString();
+
+    // ===========================
+    // Get ALL scheduled runs visible to this user
+    // ===========================
+    const rows = await db.any(
+      `
+      WITH my_followed AS (
+        SELECT friend_id AS friend
+        FROM friends
+        WHERE user_id = $1 AND status = 'following'
+      )
+      SELECT
+        sr.id,
+        sr.organizer_id,
+        sr.start_time,
+        sr.location,
+        sr.expected_miles,
+        sr.visibility,
+        sr.notes,
+        u.first_name,
+        u.last_name,
+        u.profile_picture,
+        CASE
+          WHEN sr.organizer_id = $1 THEN 'organizer'
+          WHEN sra.user_id IS NOT NULL THEN 'attendee'
+          WHEN sr.visibility = 'public' AND sr.organizer_id IN (SELECT friend FROM my_followed) THEN 'friend_public'
+          ELSE 'other'
+        END AS role
+      FROM scheduled_runs sr
+      JOIN users u ON u.id = sr.organizer_id
+      
+      -- check if the current user has joined
+      LEFT JOIN scheduled_run_attendees sra
+        ON sra.scheduled_run_id = sr.id
+       AND sra.user_id = $1
+       AND sra.status IN ('going','maybe','invited')
+      
+      WHERE sr.start_time >= $2
+        AND sr.start_time <  $3
+        
+        AND (
+          sr.organizer_id = $1                   -- your runs
+          OR sra.user_id IS NOT NULL            -- runs you joined
+          OR (sr.visibility = 'public' AND sr.organizer_id IN (SELECT friend FROM my_followed)) -- public friend runs
+        )
+      
+      ORDER BY sr.start_time ASC;
+      `,
+      [me, fromISO, toISO]
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error('❌ Error fetching calendar:', err);
+    res.status(500).json({ error: 'Failed to fetch calendar' });
+  }
+});
+
+
+
+
+
+
+
 
 // *****************************************************
 // <!-- Dev Route: Create Test Friends and Requests -->
@@ -862,15 +972,15 @@ app.get('/api/feed', async (req, res) => {
 app.get('/dev/create-friends-and-requests', async (req, res) => {
   try {
     const confirmedFriends = [
-      { user_id: 7, friend_id: 2 },
-      { user_id: 7, friend_id: 3 },
-      { user_id: 7, friend_id: 4 }
+      { user_id: 6, friend_id: 2 },
+      { user_id: 6, friend_id: 3 },
+      { user_id: 6, friend_id: 4 }
     ];
 
     const followRequests = [
-      { user_id: 5, friend_id: 7 },
-      { user_id: 6, friend_id: 7 },
-      { user_id: 1, friend_id: 7 }
+      { user_id: 5, friend_id: 6 },
+      { user_id: 4, friend_id: 6 },
+      { user_id: 1, friend_id: 6 }
     ];
 
     for (const { user_id, friend_id } of confirmedFriends) {
@@ -939,6 +1049,194 @@ app.get('/dev/create-friends-and-requests', async (req, res) => {
   } catch (err) {
     console.error('❌ Error creating test data:', err);
     res.status(500).send('Server error');
+  }
+});
+
+
+// *****************************************************
+// <!-- Dev Route: Create Test Scheduled Runs (+ attendees) -->
+// *****************************************************
+// http://localhost:5001/dev/create-scheduled-runs
+app.get('/dev/create-scheduled-runs', async (req, res) => {
+  // Change this if your logged-in dev user is a different ID
+  const ME = 6;
+
+  // Helper: date builder -> ISO at specific hour/min, daysFromNow offset
+  const isoAt = (daysFromNow, hour = 7, minute = 0) => {
+    const now = new Date();
+    const d = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + daysFromNow,
+      hour,
+      minute,
+      0,
+      0
+    );
+    return d.toISOString(); // UTC ISO
+  };
+
+  // Seed data (tweak as you like)
+  const seedRuns = [
+    // --- Organizer = me (id=6) ---
+    {
+      organizer_id: ME,
+      start_time: isoAt(1, 7, 0),
+      location: "Boulder Creek Path",
+      expected_miles: 3.5,
+      visibility: "public",
+      notes: "Easy shakeout"
+    },
+    {
+      organizer_id: ME,
+      start_time: isoAt(3, 18, 15),
+      location: "CU Rec Center Track",
+      expected_miles: 4.0,
+      visibility: "private",
+      notes: "Evening tempo — meet by gate"
+    },
+    {
+      organizer_id: ME,
+      start_time: isoAt(6, 8, 0),
+      location: "Chautauqua Bluebell Road",
+      expected_miles: 5.2,
+      visibility: "public",
+      notes: "Hilly route"
+    },
+
+    // --- Friends organize public runs ---
+    {
+      organizer_id: 2,
+      start_time: isoAt(2, 7, 30),
+      location: "Valmont Bike Park Loop",
+      expected_miles: 3.0,
+      visibility: "public",
+      notes: "Soft surface; relaxed pace"
+    },
+    {
+      organizer_id: 3,
+      start_time: isoAt(4, 18, 0),
+      location: "Boulder Reservoir",
+      expected_miles: 6.0,
+      visibility: "public",
+      notes: "Sunset loop"
+    },
+    {
+      organizer_id: 4,
+      start_time: isoAt(9, 7, 0),
+      location: "Wonderland Lake Path",
+      expected_miles: 4.5,
+      visibility: "public",
+      notes: "Shoes test day"
+    },
+
+    // --- Friend organizes a private run (should only show if you join) ---
+    {
+      organizer_id: 4,
+      start_time: isoAt(10, 8, 0),
+      location: "Marshall Mesa",
+      expected_miles: 5.0,
+      visibility: "private",
+      notes: "Trail; watch mud conditions"
+    }
+  ];
+
+  // Optional attendees to test joins/roles
+  // (We’ll add ME to some friend public runs; and a friend to my public runs)
+  const seedAttendees = [
+    // I join friend public runs
+    { join_on: "Valmont Bike Park Loop", user_id: ME, status: "going" },
+    { join_on: "Boulder Reservoir", user_id: ME, status: "maybe" },
+
+    // Friend joins one of my public runs
+    { join_on: "Chautauqua Bluebell Road", user_id: 2, status: "going" },
+
+    // I also join a friend's private run so it shows up for me
+    { join_on: "Marshall Mesa", user_id: ME, status: "invited" }
+  ];
+
+  try {
+    // Ensure tables exist (no-op if already created)
+    await db.none(`
+      CREATE TABLE IF NOT EXISTS scheduled_runs (
+        id SERIAL PRIMARY KEY,
+        organizer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        start_time TIMESTAMP NOT NULL,
+        location TEXT NOT NULL,
+        expected_miles NUMERIC(5,2) NOT NULL CHECK (expected_miles > 0),
+        visibility VARCHAR(10) NOT NULL DEFAULT 'private' CHECK (visibility IN ('private','public')),
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS scheduled_run_attendees (
+        id SERIAL PRIMARY KEY,
+        scheduled_run_id INTEGER NOT NULL REFERENCES scheduled_runs(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        status VARCHAR(12) NOT NULL DEFAULT 'going' CHECK (status IN ('going','maybe','declined','invited')),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT unique_attendee UNIQUE (scheduled_run_id, user_id)
+      );
+    `);
+
+    // Insert runs
+    const inserted = [];
+    for (const r of seedRuns) {
+      const row = await db.one(
+        `
+        INSERT INTO scheduled_runs (organizer_id, start_time, location, expected_miles, visibility, notes)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, organizer_id, start_time, location, expected_miles, visibility
+        `,
+        [
+          r.organizer_id,
+          r.start_time,
+          r.location,
+          r.expected_miles,
+          r.visibility,
+          r.notes || null
+        ]
+      );
+      inserted.push(row);
+    }
+
+    // Build a map from location -> run_id for quick attendee linking (dev convenience)
+    const byLocation = new Map(inserted.map((r) => [r.location, r.id]));
+
+    // Insert attendees
+    const attendeeRows = [];
+    for (const a of seedAttendees) {
+      const runId = byLocation.get(a.join_on);
+      if (!runId) continue; // skip if not found
+      try {
+        const ar = await db.one(
+          `
+          INSERT INTO scheduled_run_attendees (scheduled_run_id, user_id, status)
+          VALUES ($1, $2, $3)
+          ON CONFLICT (scheduled_run_id, user_id) DO UPDATE SET status = EXCLUDED.status
+          RETURNING id, scheduled_run_id, user_id, status
+          `,
+          [runId, a.user_id, a.status]
+        );
+        attendeeRows.push(ar);
+      } catch (e) {
+        // ignore duplicate issues, continue seeding
+        console.warn("Attendee insert warning:", e.message);
+      }
+    }
+
+    res.json({
+      ok: true,
+      inserted_runs: inserted.length,
+      inserted_attendees: attendeeRows.length,
+      sample: {
+        runs: inserted.slice(0, 3),
+        attendees: attendeeRows.slice(0, 3)
+      }
+    });
+  } catch (err) {
+    console.error("❌ Error creating scheduled runs:", err);
+    res.status(500).send("Server error creating scheduled runs");
   }
 });
 

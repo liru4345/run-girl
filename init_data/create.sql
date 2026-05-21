@@ -4,7 +4,7 @@ CREATE TABLE  IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   first_name VARCHAR(50) NOT NULL,
   last_name VARCHAR(50),
-  email VARCHAR(100) NOT NULL,
+  email VARCHAR(100) NOT NULL UNIQUE,
   password TEXT NOT NULL,
   phone_number VARCHAR(15) NOT NULL, --removed unique for testing
   profile_picture TEXT,
@@ -90,3 +90,42 @@ CREATE TABLE IF NOT EXISTS run_watchers (
   run_id INTEGER REFERENCES runs(id) ON DELETE CASCADE,
   watcher_id INTEGER REFERENCES users(id) ON DELETE CASCADE
 );
+
+-- === SCHEDULED RUNS (planned/future runs) ===
+CREATE TABLE IF NOT EXISTS scheduled_runs (
+  id               SERIAL PRIMARY KEY,
+  organizer_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  start_time       TIMESTAMP NOT NULL,                 -- date + time in one column
+  location         TEXT NOT NULL,
+  expected_miles   NUMERIC(5,2) NOT NULL CHECK (expected_miles > 0),
+  visibility       VARCHAR(10) NOT NULL DEFAULT 'private'
+                     CHECK (visibility IN ('private','public')),
+  notes            TEXT,
+  created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Helpful indexes (month views + visibility filters are common)
+CREATE INDEX IF NOT EXISTS idx_scheduled_runs_start_time
+  ON scheduled_runs (start_time);
+
+CREATE INDEX IF NOT EXISTS idx_scheduled_runs_visibility
+  ON scheduled_runs (visibility);
+
+CREATE INDEX IF NOT EXISTS idx_scheduled_runs_organizer
+  ON scheduled_runs (organizer_id);
+
+-- === ATTENDEES (friends who join a scheduled run) ===
+-- For public runs, any friend can join (app enforces “friend” check).
+-- For private runs, only the organizer or invited users should be allowed (app logic).
+CREATE TABLE IF NOT EXISTS scheduled_run_attendees (
+  id                SERIAL PRIMARY KEY,
+  scheduled_run_id  INTEGER NOT NULL REFERENCES scheduled_runs(id) ON DELETE CASCADE,
+  user_id           INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status            VARCHAR(12) NOT NULL DEFAULT 'going'
+                      CHECK (status IN ('going','maybe','declined','invited')),
+  created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT unique_attendee UNIQUE (scheduled_run_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sra_run ON scheduled_run_attendees (scheduled_run_id);
+CREATE INDEX IF NOT EXISTS idx_sra_user ON scheduled_run_attendees (user_id);

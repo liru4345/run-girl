@@ -37,3 +37,19 @@
   box-shadow: #ff69b4 !important;
   outline: none !important;
 }
+
+/* Pink helpers for the calendar */
+.btn-outline-pink {
+  color: #ff69b4;
+  border: 1px solid #ff69b4;
+  background: transparent;
+}
+.btn-outline-pink:hover {
+  background: #ff69b4;
+  color: #fff;
+}
+
+.bg-pink {
+  background-color: #ff69b4 !important;
+  color: #fff !important;
+}
