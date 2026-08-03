@@ -1,10 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { searchFriends, friendsAction, cancelFriendRequest } from '../services/api';
 import ScreenWrapper from '../components/ScreenWrapper';
+import Header from '../components/Header';
+import { AuthContext } from '../services/authContext';
+import { colors } from '../styles/colors';
+import { spacing } from '../styles/spacing';
+import { typography } from '../styles/typography';
 
+function Avatar({ name }) {
+  return (
+    <View style={styles.avatar}>
+      <Text style={styles.avatarText}>{name?.[0]?.toUpperCase() || '?'}</Text>
+    </View>
+  );
+}
 
-export default function FriendsScreen() {
+export default function FriendsScreen({ navigation }) {
+  const { user } = useContext(AuthContext);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -61,14 +75,15 @@ export default function FriendsScreen() {
     const isFollowing = item.status === 'following';
 
     return (
-      <View style={styles.userCard}>
-        <View>
+      <View style={styles.userRow}>
+        <Avatar name={item.name} />
+        <View style={styles.userTextWrap}>
           <Text style={styles.userName}>{item.name}</Text>
           <Text style={styles.userMeta}>{item.phone}</Text>
         </View>
         {isFollowing ? (
           <TouchableOpacity style={[styles.requestButton, styles.unfollowButton]} onPress={() => handleAction(item.id, 'unfollow')}>
-            <Text style={styles.requestedText}>Unfollow</Text>
+            <Text style={styles.requestedText}>Following</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
@@ -76,124 +91,84 @@ export default function FriendsScreen() {
             onPress={() => (isRequested ? handleCancel(item.id) : handleAction(item.id, 'request'))}
           >
             <Text style={[styles.requestText, isRequested && styles.requestedText]}>
-              {isRequested ? 'Cancel' : 'Follow'}
+              {isRequested ? 'Requested' : 'Follow'}
             </Text>
           </TouchableOpacity>
         )}
       </View>
-      
     );
   };
 
   return (
     <ScreenWrapper>
-    <View style={styles.container}>
-      <Text style={styles.title}>Find friends</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Search by name or phone number"
-        value={query}
-        onChangeText={setQuery}
-        returnKeyType="search"
-        onSubmitEditing={handleSearch}
-      />
-      <TouchableOpacity style={styles.searchButton} onPress={handleSearch} disabled={loading}>
-        <Text style={styles.searchButtonText}>{loading ? 'Searching…' : 'Search'}</Text>
-      </TouchableOpacity>
+      <Header navigation={navigation} />
+      <View style={styles.container}>
+        <Text style={styles.title}>Search</Text>
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={18} color={colors.gray500} />
+          <TextInput
+            style={styles.input}
+            placeholder="Search by name or phone number"
+            placeholderTextColor={colors.gray500}
+            value={query}
+            onChangeText={setQuery}
+            returnKeyType="search"
+            onSubmitEditing={handleSearch}
+          />
+          {query ? (
+            <TouchableOpacity onPress={() => setQuery('')}>
+              <Ionicons name="close-circle" size={18} color={colors.gray400} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
 
-      <FlatList
-        data={results}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={renderItem}
-        ListEmptyComponent={<Text style={styles.empty}>No friends found. Search to discover runners.</Text>}
-        contentContainerStyle={results.length === 0 && styles.emptyContainer}
-      />
-    </View>
+        <FlatList
+          data={results}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={renderItem}
+          ListEmptyComponent={
+            <Text style={styles.empty}>{loading ? 'Searching…' : 'No runners found. Search to discover people.'}</Text>
+          }
+          contentContainerStyle={results.length === 0 && styles.emptyContainer}
+        />
+      </View>
     </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 24,
-    backgroundColor: '#fff5fb'
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#163e8a',
-    marginBottom: 16
-  },
-  input: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    height: 50,
-    borderWidth: 1,
-    borderColor: '#d8ddee',
-    marginBottom: 12
-  },
-  searchButton: {
-    backgroundColor: '#ff69b4',
-    borderRadius: 14,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 16
-  },
-  searchButtonText: {
-    color: '#fff',
-    fontWeight: '700'
-  },
-  userCard: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#f7d6e2',
+  container: { flex: 1, paddingHorizontal: spacing.lg, backgroundColor: colors.white },
+  title: { fontSize: typography['2xl'], fontWeight: '700', color: colors.ink, marginBottom: spacing.md },
+  searchBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
+    backgroundColor: colors.gray100,
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    height: 40,
+    marginBottom: spacing.lg,
   },
-  userName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#163e8a'
+  input: { flex: 1, marginLeft: spacing.sm, fontSize: typography.sm, color: colors.ink },
+  userRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
   },
-  userMeta: {
-    color: '#5e6a88',
-    marginTop: 6
+  avatar: {
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: colors.pink100, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: colors.pink300,
   },
-  requestButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 14
-  },
-  primaryButton: {
-    backgroundColor: '#ff69b4'
-  },
-  unfollowButton: {
-    backgroundColor: '#fbe2eb'
-  },
-  requestText: {
-    color: '#fff',
-    fontWeight: '700'
-  },
-  requested: {
-    backgroundColor: '#ffe6ec'
-  },
-  requestedText: {
-    color: '#ff69b4',
-    fontWeight: '700'
-  },
-  empty: {
-    color: '#5e6a88',
-    marginTop: 36,
-    textAlign: 'center'
-  },
-  emptyContainer: {
-    flexGrow: 1,
-    justifyContent: 'center'
-  }
+  avatarText: { color: colors.pink600, fontWeight: '700', fontSize: typography.lg },
+  userTextWrap: { flex: 1, marginLeft: spacing.md },
+  userName: { fontSize: typography.sm, fontWeight: '700', color: colors.ink },
+  userMeta: { color: colors.gray600, fontSize: typography.xs, marginTop: 2 },
+  requestButton: { paddingVertical: 7, paddingHorizontal: spacing.md, borderRadius: 8 },
+  primaryButton: { backgroundColor: colors.pink500 },
+  unfollowButton: { backgroundColor: colors.gray100 },
+  requestText: { color: colors.white, fontWeight: '700', fontSize: typography.xs },
+  requested: { backgroundColor: colors.gray100 },
+  requestedText: { color: colors.ink, fontWeight: '700', fontSize: typography.xs },
+  empty: { color: colors.gray600, marginTop: 36, textAlign: 'center' },
+  emptyContainer: { flexGrow: 1, justifyContent: 'center' },
 });

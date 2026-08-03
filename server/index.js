@@ -477,7 +477,7 @@ app.get('/api/start-run', async (req, res) => {
 
   try {
     const friends = await db.any(`
-      SELECT u.id, u.first_name, u.last_name, u.profile_picture
+      SELECT u.id, u.first_name, u.last_name, u.profile_picture, u.phone_number, u.email
       FROM friends f
       JOIN users u ON 
         (u.id = f.friend_id AND f.user_id = $1) OR 

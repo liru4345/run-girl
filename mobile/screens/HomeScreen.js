@@ -2,17 +2,21 @@ import React, { useContext } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { AuthContext } from '../services/authContext';
 import ScreenWrapper from '../components/ScreenWrapper';
-
+import Header from '../components/Header';
+import { colors } from '../styles/colors';
+import { spacing } from '../styles/spacing';
+import { typography } from '../styles/typography';
 
 export default function HomeScreen({ navigation }) {
   const { user, signOut } = useContext(AuthContext);
 
   return (
     <ScreenWrapper>
+      <Header navigation={navigation} />
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.heroCard}>
-          <Text style={styles.heroTitle}>Run Girl</Text>
-          <Text style={styles.heroSubtitle}>Run together, stay safe, and keep the girl squad moving.</Text>
+          <Text style={styles.heroTitle}>Welcome back, {user?.first_name}!</Text>
+          <Text style={styles.heroSubtitle}>Run together, stay safe, and keep moving.</Text>
           <TouchableOpacity style={styles.heroButton} onPress={() => navigation.navigate('StartRun')}>
             <Text style={styles.heroButtonText}>Start a run</Text>
           </TouchableOpacity>
@@ -39,8 +43,8 @@ export default function HomeScreen({ navigation }) {
       <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('Notifications')}>
         <Text style={styles.actionText}>Notifications</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('Feed')}>
-        <Text style={styles.actionText}>Run feed</Text>
+      <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('Home')}>
+        <Text style={styles.actionText}>Feed</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.actionButtonSecondary} onPress={() => navigation.navigate('Calendar')}>
         <Text style={styles.actionTextSecondary}>Calendar</Text>
@@ -55,97 +59,99 @@ export default function HomeScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 24,
-    backgroundColor: '#fff5fb',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    backgroundColor: colors.white,
     alignItems: 'stretch'
   },
   heroCard: {
-    backgroundColor: '#ff69b4',
-    borderRadius: 24,
-    padding: 24,
-    marginBottom: 20
+    backgroundColor: colors.pink500,
+    borderRadius: 16,
+    padding: spacing.lg,
+    marginBottom: spacing.lg
   },
   heroTitle: {
-    fontSize: 34,
-    fontWeight: '800',
-    color: '#fff',
-    marginBottom: 12
+    fontSize: typography.xl,
+    fontWeight: '700',
+    color: colors.white,
+    marginBottom: spacing.sm
   },
   heroSubtitle: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#ffe6f0',
-    marginBottom: 20
+    fontSize: typography.sm,
+    lineHeight: 20,
+    color: colors.pink100,
+    marginBottom: spacing.md
   },
   heroButton: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 16,
+    backgroundColor: colors.white,
+    padding: spacing.md,
+    borderRadius: 10,
     alignItems: 'center'
   },
   heroButtonText: {
-    color: '#ff69b4',
+    color: colors.pink500,
     fontWeight: '700',
-    fontSize: 16
+    fontSize: typography.sm
   },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 20
+    marginBottom: spacing.lg
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 18,
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    padding: spacing.md,
     borderWidth: 1,
-    borderColor: '#f4d0e6',
-    marginRight: 10
+    borderColor: colors.border,
+    marginRight: spacing.sm
   },
   statLabel: {
-    color: '#7a2c5a',
-    marginBottom: 8,
-    fontWeight: '600'
+    color: colors.gray600,
+    marginBottom: spacing.xs,
+    fontWeight: '600',
+    fontSize: typography.xs
   },
   statValue: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#ff69b4'
+    fontSize: typography.xl,
+    fontWeight: '700',
+    color: colors.pink500
   },
   sectionTitle: {
-    color: '#163e8a',
-    fontSize: 20,
+    color: colors.ink,
+    fontSize: typography.lg,
     fontWeight: '700',
-    marginBottom: 12
+    marginBottom: spacing.md
   },
   actionButton: {
-    backgroundColor: '#ff69b4',
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: colors.pink500,
+    borderRadius: 10,
+    padding: spacing.md,
     alignItems: 'center',
-    marginBottom: 12
+    marginBottom: spacing.sm
   },
   actionText: {
-    color: '#fff',
+    color: colors.white,
     fontWeight: '700',
-    fontSize: 16
+    fontSize: typography.sm
   },
   actionButtonSecondary: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: colors.white,
+    borderRadius: 10,
+    padding: spacing.md,
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: spacing.sm,
     borderWidth: 1,
-    borderColor: '#ff69b4'
+    borderColor: colors.pink500
   },
   actionTextSecondary: {
-    color: '#ff69b4',
+    color: colors.pink500,
     fontWeight: '700',
-    fontSize: 16
+    fontSize: typography.sm
   },
   logoutButton: {
-    backgroundColor: '#ffe6ec',
-    borderColor: '#ff5a5f'
+    backgroundColor: colors.gray50,
+    borderColor: colors.pink600
   }
 });

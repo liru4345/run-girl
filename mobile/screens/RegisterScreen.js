@@ -1,8 +1,10 @@
 import React, { useContext, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, Image } from 'react-native';
 import { AuthContext } from '../services/authContext';
 import ScreenWrapper from '../components/ScreenWrapper';
-
+import { colors } from '../styles/colors';
+import { spacing } from '../styles/spacing';
+import { typography } from '../styles/typography';
 
 export default function RegisterScreen({ navigation }) {
   const { signUp } = useContext(AuthContext);
@@ -26,7 +28,7 @@ export default function RegisterScreen({ navigation }) {
         last_name: lastName,
         email,
         phone_number: phoneNumber,
-        password
+        password,
       });
     } catch (error) {
       Alert.alert('Registration failed', error.error || 'Unable to register.');
@@ -36,46 +38,78 @@ export default function RegisterScreen({ navigation }) {
   };
 
   return (
-    <ScreenWrapper> 
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Create your account</Text>
-        <Text style={styles.subtitle}>Join Run Girl and connect with your running crew.</Text>
-        <TextInput placeholder="First name" style={styles.input} value={firstName} onChangeText={setFirstName} />
-        <TextInput placeholder="Last name" style={styles.input} value={lastName} onChangeText={setLastName} />
-        <TextInput
-          placeholder="Email"
-          style={styles.input}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          value={email}
-          onChangeText={setEmail}
-        />
-        <TextInput
-          placeholder="Phone number"
-          style={styles.input}
-          keyboardType="phone-pad"
-          value={phoneNumber}
-          onChangeText={setPhoneNumber}
-        />
-        <TextInput
-          placeholder="Password"
-          style={styles.input}
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
-        <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
-          <Text style={styles.buttonText}>{loading ? 'Registering...' : 'Register'}</Text>
-        </TouchableOpacity>
-        <View style={styles.footer}>
-          <Text style={styles.helper}>Already have an account?</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-            <Text style={styles.link}>Log In</Text>
-          </TouchableOpacity>
+    <ScreenWrapper>
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.logoContainer}>
+          <Image source={require('../assets/logo.png')} style={styles.logo} resizeMode="contain" />
         </View>
-      </View>
-    </ScrollView>
+
+        <View style={styles.card}>
+          <Text style={styles.title}>Create your account</Text>
+          <Text style={styles.subtitle}>Join us and connect with your running crew.</Text>
+
+          <TextInput
+            placeholder="First name"
+            style={styles.input}
+            placeholderTextColor={colors.gray500}
+            value={firstName}
+            onChangeText={setFirstName}
+          />
+
+          <TextInput
+            placeholder="Last name"
+            style={styles.input}
+            placeholderTextColor={colors.gray500}
+            value={lastName}
+            onChangeText={setLastName}
+          />
+
+          <TextInput
+            placeholder="Email"
+            style={styles.input}
+            placeholderTextColor={colors.gray500}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            value={email}
+            onChangeText={setEmail}
+          />
+
+          <TextInput
+            placeholder="Phone number"
+            style={styles.input}
+            placeholderTextColor={colors.gray500}
+            keyboardType="phone-pad"
+            value={phoneNumber}
+            onChangeText={setPhoneNumber}
+          />
+
+          <TextInput
+            placeholder="Password"
+            style={styles.input}
+            placeholderTextColor={colors.gray500}
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+          />
+
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleRegister}
+            disabled={loading}
+          >
+            <Text style={styles.buttonText}>{loading ? 'Registering...' : 'Register'}</Text>
+          </TouchableOpacity>
+
+          <View style={styles.divider} />
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Already have an account?</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+              <Text style={styles.link}>Log In</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
     </ScreenWrapper>
   );
 }
@@ -83,65 +117,80 @@ export default function RegisterScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    justifyContent: 'center',
-    padding: 24,
-    backgroundColor: '#fff5fb'
+    backgroundColor: colors.white,
+    paddingBottom: spacing['3xl'],
+  },
+  logoContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing['2xl'],
+    paddingTop: spacing['2xl'],
+  },
+  logo: {
+    width: 140,
+    height: 80,
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: '#f7d6e2',
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 4
+    marginHorizontal: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing['2xl'],
   },
   title: {
-    fontSize: 30,
-    fontWeight: '800',
-    marginBottom: 8,
-    color: '#163e8a'
+    fontSize: typography['2xl'],
+    fontWeight: '700',
+    color: colors.ink,
+    marginBottom: spacing.sm,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#5e6a88',
-    marginBottom: 24
+    fontSize: typography.sm,
+    color: colors.gray600,
+    lineHeight: 20,
+    marginBottom: spacing.lg,
   },
   input: {
-    height: 52,
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    marginBottom: 14,
+    height: 48,
+    backgroundColor: colors.gray50,
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    fontSize: typography.sm,
     borderWidth: 1,
-    borderColor: '#d8ddee'
+    borderColor: colors.border,
+    color: colors.ink,
   },
   button: {
-    backgroundColor: '#ff69b4',
-    height: 52,
-    borderRadius: 14,
+    backgroundColor: colors.pink500,
+    height: 48,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 6
+    marginTop: spacing.md,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   buttonText: {
-    color: '#fff',
+    color: colors.white,
     fontWeight: '700',
-    fontSize: 16
+    fontSize: typography.sm,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.lg,
   },
   footer: {
-    marginTop: 20,
     flexDirection: 'row',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  helper: {
-    marginRight: 8,
-    color: '#5e6a88'
+  footerText: {
+    marginRight: spacing.xs,
+    color: colors.gray600,
+    fontSize: typography.sm,
   },
   link: {
-    color: '#ff69b4',
-    fontWeight: '700'
-  }
+    color: colors.pink500,
+    fontWeight: '700',
+    fontSize: typography.sm,
+  },
 });

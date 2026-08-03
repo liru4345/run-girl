@@ -1,11 +1,17 @@
 {
   "expo": {
-    "name": "Run Girl",
-    "slug": "run-girl",
+    "name": "Run Her",
+    "slug": "run-her",
     "version": "1.0.0",
     "sdkVersion": "54.0.0",
     "platforms": ["ios", "android", "web"],
     "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "bundleIdentifier": "com.runher.mobile"
+    },
+    "android": {
+      "package": "com.runher.mobile"
+    },
     "extra": {
       "apiUrl": "http://10.0.0.223:5001"
     }

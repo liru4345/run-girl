@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { finishRun } from '../services/api';
 import ScreenWrapper from '../components/ScreenWrapper';
-
+import { colors } from '../styles/colors';
+import { spacing } from '../styles/spacing';
+import { typography } from '../styles/typography';
 
 export default function RunRecapScreen({ route, navigation }) {
   const { location, duration } = route.params || {};
@@ -35,11 +38,17 @@ export default function RunRecapScreen({ route, navigation }) {
   };
 
   return (
-    <ScreenWrapper> 
+    <ScreenWrapper>
+    <View style={styles.header}>
+      <TouchableOpacity onPress={() => navigation.goBack()}>
+        <Ionicons name="chevron-back" size={28} color={colors.ink} />
+      </TouchableOpacity>
+      <Text style={styles.headerTitle}>Run recap</Text>
+      <View style={{ width: 28 }} />
+    </View>
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Run recap</Text>
-      <Text style={styles.subtitle}>Location: {location || 'Main Campus'}</Text>
-      <Text style={styles.subtitle}>Duration: {duration ? `${duration} min` : '30 min'}</Text>
+      <Text style={styles.metaText}>Location: {location || 'Main Campus'}</Text>
+      <Text style={styles.metaText}>Duration: {duration ? `${duration} min` : '30 min'}</Text>
 
       <View style={styles.card}>
         <Text style={styles.label}>Distance (miles)</Text>
@@ -49,6 +58,7 @@ export default function RunRecapScreen({ route, navigation }) {
           keyboardType="decimal-pad"
           style={styles.input}
           placeholder="e.g. 3.5"
+          placeholderTextColor={colors.gray500}
         />
       </View>
 
@@ -61,14 +71,15 @@ export default function RunRecapScreen({ route, navigation }) {
           multiline
           numberOfLines={6}
           placeholder="How was your run?"
+          placeholderTextColor={colors.gray500}
         />
       </View>
 
       <View style={styles.buttonGroup}>
-        <TouchableOpacity style={styles.primaryButton} onPress={() => handleFinish('post')} disabled={loading}>
+        <TouchableOpacity style={[styles.primaryButton, loading && styles.buttonDisabled]} onPress={() => handleFinish('post')} disabled={loading}>
           <Text style={styles.primaryButtonText}>{loading ? 'Posting…' : 'Post run'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryButton} onPress={() => handleFinish('save')} disabled={loading}>
+        <TouchableOpacity style={[styles.secondaryButton, loading && styles.buttonDisabled]} onPress={() => handleFinish('save')} disabled={loading}>
           <Text style={styles.secondaryButtonText}>{loading ? 'Saving…' : 'Save only'}</Text>
         </TouchableOpacity>
       </View>
@@ -78,72 +89,85 @@ export default function RunRecapScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.border,
+  },
+  headerTitle: { fontSize: typography.lg, fontWeight: '700', color: colors.ink },
   container: {
-    padding: 24,
-    backgroundColor: '#fff5fb'
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    backgroundColor: colors.white,
+    paddingBottom: spacing['3xl'],
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#163e8a',
-    marginBottom: 10
-  },
-  subtitle: {
-    color: '#5e6a88',
-    marginBottom: 16
-  },
+  metaText: { color: colors.gray700, marginBottom: spacing.sm, fontSize: typography.sm },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 16,
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: '#f7d6e2'
+    borderColor: colors.border,
+    marginTop: spacing.md,
   },
   label: {
-    color: '#5e6a88',
-    marginBottom: 10
+    color: colors.gray700,
+    marginBottom: spacing.sm,
+    fontSize: typography.sm,
   },
   input: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    height: 50,
+    backgroundColor: colors.gray50,
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    height: 44,
     borderWidth: 1,
-    borderColor: '#d8ddee'
+    borderColor: colors.border,
+    fontSize: typography.sm,
+    color: colors.ink,
   },
   textArea: {
-    height: 140,
-    paddingTop: 14,
-    textAlignVertical: 'top'
+    height: 120,
+    paddingTop: spacing.md,
+    textAlignVertical: 'top',
   },
   buttonGroup: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 12
+    gap: spacing.md,
+    marginTop: spacing.lg,
   },
   primaryButton: {
     flex: 1,
-    backgroundColor: '#ff69b4',
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center'
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontWeight: '700'
+    backgroundColor: colors.pink500,
+    borderRadius: 10,
+    padding: spacing.md,
+    alignItems: 'center',
   },
   secondaryButton: {
     flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: colors.white,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#ff69b4',
-    padding: 16,
-    alignItems: 'center'
+    borderColor: colors.pink500,
+    padding: spacing.md,
+    alignItems: 'center',
+  },
+  primaryButtonText: {
+    color: colors.white,
+    fontWeight: '700',
+    fontSize: typography.sm,
   },
   secondaryButtonText: {
-    color: '#ff69b4',
-    fontWeight: '700'
-  }
+    color: colors.pink500,
+    fontWeight: '700',
+    fontSize: typography.sm,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
 });
