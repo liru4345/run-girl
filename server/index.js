@@ -648,6 +648,27 @@ app.post('/api/runs/:id/checkin', async (req, res) => {
   }
 });
 
+// Active runs the logged-in user is watching (powers the in-app "on a run" banner).
+app.get('/api/runs/watching', async (req, res) => {
+  const userId = req.session.user?.id;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const runs = await db.any(`
+      SELECT r.id, r.status, r.location, r.end_time, u.first_name, u.last_name
+      FROM run_watchers rw
+      JOIN runs r ON r.id = rw.run_id
+      JOIN users u ON u.id = r.user_id
+      WHERE rw.watcher_id = $1 AND r.status IN ('in_progress', 'overdue')
+      ORDER BY (r.status = 'overdue') DESC, r.start_time DESC
+    `, [userId]);
+    res.json({ runs });
+  } catch (err) {
+    console.error('❌ Error loading watched runs:', err);
+    res.status(500).json({ error: 'Failed to load watched runs' });
+  }
+});
+
 // Live status for the runner and their watchers.
 app.get('/api/runs/:id/track', async (req, res) => {
   const userId = req.session.user?.id;

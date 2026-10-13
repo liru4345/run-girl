@@ -16,6 +16,7 @@ import UserPosts from "./pages/userPosts";
 import Feed from "./pages/feed";
 import Calender from "./pages/calender";
 import TrackRun from "./pages/trackRun";
+import WatchingBanner from "./components/watchingBanner";
 
 
 
@@ -27,6 +28,7 @@ function App() {
   return (
     <>
       <Header />
+      <WatchingBanner />
       <div className="container mt-4">
         <Routes>
           <Route path="/" element={<Homepage />} />
