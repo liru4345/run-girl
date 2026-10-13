@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { FaPhoneAlt, FaCommentDots, FaMapMarkerAlt, FaExternalLinkAlt, FaCheckCircle, FaExclamationTriangle } from 'react-icons/fa';
 import Avatar from '../components/avatar';
 
 // Live status page for a run, shown to the runner and their watchers.
 const REFRESH_MS = 15000;
 
-const STATUS_STYLES = {
-  in_progress: { label: 'Running', className: 'bg-primary' },
-  overdue: { label: 'Overdue: hasn\'t checked in', className: 'bg-danger' },
-  completed: { label: 'Finished safely', className: 'bg-success' },
+const STATUS = {
+  in_progress: { label: 'Out running', hero: '', icon: null },
+  overdue: { label: "Overdue · hasn't checked in", hero: 'overdue', icon: <FaExclamationTriangle /> },
+  completed: { label: 'Finished safely', hero: 'done', icon: <FaCheckCircle /> },
 };
 
 const mapEmbedUrl = (lat, lng) => {
@@ -22,6 +23,11 @@ const timeAgo = (timestamp) => {
   if (seconds < 60) return `${seconds}s ago`;
   return `${Math.round(seconds / 60)} min ago`;
 };
+
+const formatTime = (timestamp) =>
+  new Date(timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+const minutesBetween = (from, to) => Math.max(0, Math.round((new Date(to) - new Date(from)) / 60000));
 
 const TrackRun = () => {
   const { id } = useParams();
@@ -49,75 +55,111 @@ const TrackRun = () => {
     return () => clearInterval(timer);
   }, [id]);
 
-  if (error) return <p className="mt-5 text-center">{error}</p>;
-  if (!run) return <p className="mt-5 text-center">Loading...</p>;
+  if (error) {
+    return (
+      <div className="rh-page mt-5" style={{ maxWidth: 520 }}>
+        <div className="rh-card text-center py-5">
+          <div className="rh-card-title">{error}</div>
+          <p className="rh-subtle mb-0">Only the runner and their watchers can see a run.</p>
+        </div>
+      </div>
+    );
+  }
+  if (!run) return <p className="rh-subtle text-center mt-5">Loading…</p>;
 
-  const statusStyle = STATUS_STYLES[run.status] || STATUS_STYLES.in_progress;
+  const status = STATUS[run.status] || STATUS.in_progress;
   const hasLocation = run.last_lat != null;
+  const finished = run.status === 'completed';
+  const overdue = run.status === 'overdue';
+  const phoneDigits = run.phone_number ? run.phone_number.replace(/[^0-9+]/g, '') : null;
 
   return (
-    <div className="container mt-5" style={{ maxWidth: 720 }}>
-      <div className="d-flex align-items-center mb-3">
-        <Avatar
-          src={run.profile_picture}
-          firstName={run.first_name}
-          lastName={run.last_name}
-          size={64}
-          className="me-3"
-        />
-        <div>
-          <h3 className="mb-1">{run.first_name} {run.last_name}'s run</h3>
-          <span className={`badge ${statusStyle.className}`}>{statusStyle.label}</span>
+    <div className="rh-page mt-4 mb-5" style={{ maxWidth: 640 }}>
+      <div className={`rh-hero mb-3 ${status.hero}`}>
+        <div className="rh-avatar-ring mb-2" style={{ borderColor: 'rgba(255,255,255,0.85)' }}>
+          <Avatar src={run.profile_picture} firstName={run.first_name} lastName={run.last_name} size={84} />
+        </div>
+        <h3 className="fw-bold mb-2">{run.first_name} {run.last_name}</h3>
+        <span className="rh-status-pill" style={{ background: 'rgba(255,255,255,0.22)', color: '#fff' }}>
+          {status.icon || <span className="rh-live-dot me-0" />}
+          {status.label}
+        </span>
+        <div className="mt-2 opacity-75">
+          <FaMapMarkerAlt className="me-1" />
+          {run.location}
         </div>
       </div>
 
-      <ul className="list-unstyled">
-        <li><strong>Planned location:</strong> {run.location}</li>
-        <li><strong>Started:</strong> {new Date(run.start_time).toLocaleTimeString()}</li>
-        {run.status === 'completed' ? (
-          <li><strong>Finished:</strong> {new Date(run.finished_at).toLocaleTimeString()}</li>
-        ) : (
-          <li><strong>Expected back by:</strong> {new Date(run.end_time).toLocaleTimeString()}</li>
-        )}
-      </ul>
+      <div className="rh-card mb-3">
+        <div className="rh-stats">
+          <div className="rh-stat">
+            <div className="rh-label">Started</div>
+            <div className="rh-stat-value">{formatTime(run.start_time)}</div>
+          </div>
+          <div className="rh-stat">
+            <div className="rh-label">{finished ? 'Finished' : 'Back by'}</div>
+            <div className="rh-stat-value" style={overdue ? { color: '#f0436b' } : undefined}>
+              {formatTime(finished ? run.finished_at : run.end_time)}
+            </div>
+          </div>
+          <div className="rh-stat">
+            <div className="rh-label">{finished ? 'Run time' : 'Out for'}</div>
+            <div className="rh-stat-value">
+              {minutesBetween(run.start_time, finished ? run.finished_at : Date.now())} min
+            </div>
+          </div>
+        </div>
+      </div>
 
-      {run.phone_number && (
-        <div className={`card p-3 mb-3 ${run.status === 'overdue' ? 'border-danger' : ''}`}>
-          <div className="d-flex flex-wrap align-items-center gap-2">
-            <span className="me-auto">
-              <strong>Contact {run.first_name}:</strong> {run.phone_number}
-            </span>
-            <a
-              href={`tel:${run.phone_number.replace(/[^0-9+]/g, '')}`}
-              className={`btn btn-sm ${run.status === 'overdue' ? 'btn-danger' : 'btn-outline-primary'}`}
-            >
-              📞 Call
-            </a>
-            <a
-              href={`sms:${run.phone_number.replace(/[^0-9+]/g, '')}`}
-              className="btn btn-sm btn-outline-secondary"
-            >
-              💬 Text
-            </a>
+      {phoneDigits && !finished && (
+        <div className="rh-card mb-3" style={overdue ? { borderColor: '#f0436b', borderWidth: 2 } : undefined}>
+          <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
+            <div>
+              <div className="fw-semibold">
+                {overdue ? `Try to reach ${run.first_name}` : `Contact ${run.first_name}`}
+              </div>
+              <div className="rh-subtle">{run.phone_number}</div>
+            </div>
+            <div className="d-flex gap-2">
+              <a href={`tel:${phoneDigits}`} className={`rh-btn ${overdue ? 'rh-btn-primary' : 'rh-btn-secondary'}`}>
+                <FaPhoneAlt /> Call
+              </a>
+              <a href={`sms:${phoneDigits}`} className="rh-btn rh-btn-secondary">
+                <FaCommentDots /> Text
+              </a>
+            </div>
           </div>
         </div>
       )}
 
-      {hasLocation ? (
-        <>
-          <p className="text-muted small mb-1">
-            Last location update {timeAgo(run.last_location_at)}.{' '}
-            <a href={run.map_link} target="_blank" rel="noreferrer">Open in Google Maps</a>
-          </p>
+      <div className="rh-card p-0 overflow-hidden">
+        <div className="d-flex justify-content-between align-items-center px-4 py-3">
+          <div>
+            <div className="fw-semibold">{finished ? 'Last known location' : 'Live location'}</div>
+            <div className="rh-subtle small">
+              {hasLocation ? `Updated ${timeAgo(run.last_location_at)}` : 'Updates every 15 seconds while sharing'}
+            </div>
+          </div>
+          {hasLocation && (
+            <a href={run.map_link} target="_blank" rel="noreferrer" className="rh-btn rh-btn-secondary">
+              <FaExternalLinkAlt /> Google Maps
+            </a>
+          )}
+        </div>
+        {hasLocation ? (
           <iframe
             title="Runner location"
             src={mapEmbedUrl(run.last_lat, run.last_lng)}
-            style={{ width: '100%', height: 360, border: 0, borderRadius: 8 }}
+            style={{ width: '100%', height: 340, border: 0, display: 'block' }}
           />
-        </>
-      ) : (
-        <p className="text-muted">No live location shared yet.</p>
-      )}
+        ) : (
+          <div className="text-center py-5" style={{ background: '#fafafd' }}>
+            <FaMapMarkerAlt style={{ fontSize: '1.8rem', color: 'var(--rh-pink)' }} />
+            <div className="fw-semibold mt-2">No live location shared yet</div>
+            <div className="rh-subtle">Planned location: {run.location}</div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

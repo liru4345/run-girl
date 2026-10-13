@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { FaSearch, FaRunning } from 'react-icons/fa';
+import PostCard from '../components/postCard';
 
 const Feed = () => {
-  const [posts, setPosts] = useState([]);
-  const navigate = useNavigate();
+  const [posts, setPosts] = useState(null); // null while loading
 
   useEffect(() => {
     const fetchFeed = async () => {
@@ -11,59 +12,54 @@ const Feed = () => {
         const res = await fetch('/api/feed', { credentials: 'include' });
         const data = await res.json();
         if (res.ok) setPosts(data);
-        else console.error(data.error);
+        else {
+          console.error(data.error);
+          setPosts([]);
+        }
       } catch (err) {
         console.error('Error fetching feed:', err);
+        setPosts([]);
       }
     };
 
     fetchFeed();
   }, []);
 
-  const formatPace = (paceSeconds) => {
-    const minutes = Math.floor(paceSeconds / 60);
-    const seconds = Math.round(paceSeconds % 60);
-    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-  };
-
   return (
-    <div className="container mt-5">
+    <div className="rh-page mt-4 mb-5" style={{ maxWidth: 640 }}>
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2>🏃‍♀️ Feed</h2>
-        <button className="btn btn-outline-primary" onClick={() => navigate('/friends')}>
-          🔍 Find Friends
-        </button>
+        <div>
+          <h2 className="fw-bold mb-1">Feed</h2>
+          <div className="rh-subtle">Runs from people you follow</div>
+        </div>
+        <Link to="/friends" className="rh-btn rh-btn-secondary">
+          <FaSearch /> Find friends
+        </Link>
       </div>
-      <div className="row">
-        {posts.map(post => (
-          <div key={post.id} className="col-md-6 mb-4">
-            <div className="card shadow-sm">
-              {post.image && (
-                <img
-                  src={`http://localhost:5001${post.image}`}
-                  alt="post"
-                  className="card-img-top"
-                  style={{ objectFit: 'cover', height: '300px' }}
-                />
-              )}
-              <div className="card-body">
-                <h5 className="card-title">{post.first_name} {post.last_name}</h5>
-                <p className="card-text">{post.content}</p>
-                <p className="text-muted small mb-0">
-                  🏃 {post.miles} miles | ⏱ {Math.floor(post.duration_seconds / 60)} min
-                </p>
-                <p className="text-muted small">
-                  🏁 Pace: {formatPace(post.pace_seconds_per_mile)} min/mile
-                </p>
-                <p className="text-muted small">
-                  📍 {post.location} | {new Date(post.created_at).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
-          </div>
-        ))}
-        {posts.length === 0 && <p className="text-center">No posts from people you follow yet!</p>}
-      </div>
+
+      <Link to="/start-run" className="rh-card d-flex align-items-center gap-3 mb-4 text-decoration-none">
+        <span
+          className="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
+          style={{ width: 44, height: 44, background: 'var(--rh-pink-soft)', color: 'var(--rh-pink)' }}
+        >
+          <FaRunning />
+        </span>
+        <span className="flex-grow-1 rh-subtle">Heading out? Start a run and pick who's watching.</span>
+        <span className="rh-btn rh-btn-primary">Start run</span>
+      </Link>
+
+      {posts === null && <p className="rh-subtle text-center">Loading…</p>}
+
+      {posts?.length === 0 && (
+        <div className="rh-card text-center py-5">
+          <div style={{ fontSize: '2.5rem' }}>👟</div>
+          <div className="rh-card-title mt-2">Your feed is empty</div>
+          <p className="rh-subtle mb-3">Follow friends to see their runs here.</p>
+          <Link to="/friends" className="rh-btn rh-btn-primary">Find friends</Link>
+        </div>
+      )}
+
+      {posts?.map((post) => <PostCard key={post.id} post={post} />)}
     </div>
   );
 };

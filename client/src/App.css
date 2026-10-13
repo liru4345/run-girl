@@ -237,6 +237,7 @@
   box-shadow: 0 10px 30px rgba(255, 105, 180, 0.35);
 }
 .rh-hero.overdue { background: linear-gradient(135deg, #f0436b 0%, #ff7a59 100%); }
+.rh-hero.done { background: linear-gradient(135deg, #1f9d6b 0%, #4cc38a 100%); box-shadow: 0 10px 30px rgba(31, 157, 107, 0.3); }
 .rh-live-dot {
   display: inline-block;
   width: 9px;
@@ -314,6 +315,22 @@
   display: block;
 }
 .rh-upload:hover { border-color: var(--rh-pink); color: var(--rh-pink-dark); }
+
+/* Profile header */
+.rh-cover {
+  height: 130px;
+  background: linear-gradient(135deg, #ff69b4 0%, #ff8fab 55%, #ffb38a 100%);
+}
+.rh-avatar-ring {
+  border-radius: 50%;
+  border: 5px solid #fff;
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(31, 31, 41, 0.12);
+  display: inline-flex;
+}
+
+/* Feed post card */
+.rh-post .rh-stats { border-top: 1px solid var(--rh-line); }
 
 @media (max-width: 576px) {
   .rh-card { padding: 18px; }

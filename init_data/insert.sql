@@ -20,11 +20,11 @@ VALUES
 -- POSTS
 INSERT INTO posts (user_id, content, image, miles, duration_seconds, location, visibility, pace_seconds_per_mile)
 VALUES
-(1, 'Great 5k run this morning!', '/runs/run1.png', 3.10, 1620, 'Boulder, CO', 'public', 522.58),
-(2, '10 miles felt amazing today.', '/runs/run2.jpg', 10.00, 5400, 'Seattle, WA', 'public', 540.00),
-(3, 'Trail run with friends 🌲', '/runs/run3.png', 6.50, 3900, 'Rocky Mountain NP', 'private', 600.00),
+(1, 'Great 5k run this morning!', '/img/pic1.jpeg', 3.10, 1620, 'Boulder, CO', 'public', 522.58),
+(2, '10 miles felt amazing today.', NULL, 10.00, 5400, 'Seattle, WA', 'public', 540.00),
+(3, 'Trail run with friends 🌲', NULL, 6.50, 3900, 'Rocky Mountain NP', 'private', 600.00),
 (4, 'First time running at night!', NULL, 2.00, 1200, 'Austin, TX', 'public', 600.00),
-(5, 'Quick morning jog before work.', '/runs/run4.jpg', 1.80, 960, 'San Francisco, CA', 'private', 533.33);
+(5, 'Quick morning jog before work.', NULL, 1.80, 960, 'San Francisco, CA', 'private', 533.33);
 
 -- COMMENTS
 INSERT INTO comments (post_id, user_id, content)
