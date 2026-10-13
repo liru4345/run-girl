@@ -97,6 +97,12 @@ app.get('/api', (req, res) => {
 
 app.post('/api/register', async (req, res) => {
   const { first_name, last_name, email, phone_number, password } = req.body;
+  if (!first_name || !email || !phone_number || !password) {
+    return res.status(400).send({ error: 'Please fill in your name, email, phone number, and password' });
+  }
+  if (password.length < 8) {
+    return res.status(400).send({ error: 'Password must be at least 8 characters' });
+  }
   const created_at = new Date().toISOString();
   const hash = await bcrypt.hash(password, 10);
   try {

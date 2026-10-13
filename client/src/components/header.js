@@ -50,9 +50,11 @@ const Header = () => {
         style={{ objectFit: 'contain', maxWidth: '150px' }} 
       />
       </Link>
-        <Link to="/start-run" className="btn btn-outline-light btn-sm ms-2">
-           Start Run
-        </Link>
+        {user && (
+          <Link to="/start-run" className="btn btn-outline-light btn-sm ms-2">
+            Start Run
+          </Link>
+        )}
         <div className="collapse navbar-collapse">
           <ul className="navbar-nav ms-auto align-items-center">
 

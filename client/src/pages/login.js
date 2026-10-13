@@ -1,10 +1,16 @@
 import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { FaEnvelope, FaLock } from "react-icons/fa";
+import AuthLayout from "../components/authLayout";
 
 const Login = () => {
   const [form, setForm] = useState({
     email: "",
     password: "",
   });
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -12,6 +18,8 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    setSubmitting(true);
     try {
       const res = await fetch("/api/login", {
         method: "POST",
@@ -25,68 +33,71 @@ const Login = () => {
       const data = await res.json();
 
       if (res.ok) {
-        alert("Login successful");
-        // maybe redirect to dashboard or homepage
-        // window.location.href = "/dashboard";
-        window.location.href = "/profile";
+        navigate("/feed");
       } else {
-        alert(data.error || "Login failed");
+        setError(data.error === "Invalid credentials" ? "That email and password don't match." : data.error || "Login failed");
       }
     } catch (err) {
       console.error("❌ Login error:", err);
-      alert("Something went wrong");
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="container mt-5">
-      <div className="row justify-content-center">
-        <div className="col-md-6">
-          <div className="card shadow p-4">
-            <h2 className="text-center mb-4 text-primary">Login</h2>
-            <form onSubmit={handleSubmit}>
-              {/* Email */}
-              <div className="mb-3">
-                <label className="form-label">Email address</label>
-                <input
-                  type="email"
-                  name="email"
-                  className="form-control"
-                  placeholder="Enter email"
-                  required
-                  value={form.email}
-                  onChange={handleChange}
-                />
-              </div>
-
-              {/* Password */}
-              <div className="mb-3">
-                <label className="form-label">Password</label>
-                <input
-                  type="password"
-                  name="password"
-                  className="form-control"
-                  placeholder="Enter password"
-                  required
-                  value={form.password}
-                  onChange={handleChange}
-                />
-              </div>
-
-              {/* Login Button */}
-              <button type="submit" className="btn btn-primary w-100">Login</button>
-            </form>
-
-            <p className="text-center mt-3">
-              Don't have an account?{" "}
-              <a href="/register" className="text-primary">
-                Register
-              </a>
-            </p>
+    <AuthLayout title="Welcome back" subtitle="Log in to see your friends' runs and start your own.">
+      <form onSubmit={handleSubmit} noValidate={false}>
+        <div className="mb-3">
+          <label className="rh-label mb-1" htmlFor="login-email">Email</label>
+          <div className="rh-input-icon">
+            <FaEnvelope />
+            <input
+              id="login-email"
+              type="email"
+              name="email"
+              className="form-control rh-input"
+              placeholder="you@example.com"
+              autoComplete="email"
+              required
+              value={form.email}
+              onChange={handleChange}
+            />
           </div>
         </div>
-      </div>
-    </div>
+
+        <div className="mb-4">
+          <label className="rh-label mb-1" htmlFor="login-password">Password</label>
+          <div className="rh-input-icon">
+            <FaLock />
+            <input
+              id="login-password"
+              type="password"
+              name="password"
+              className="form-control rh-input"
+              placeholder="Your password"
+              autoComplete="current-password"
+              required
+              value={form.password}
+              onChange={handleChange}
+            />
+          </div>
+        </div>
+
+        {error && <div className="rh-notice error mb-3" role="alert">{error}</div>}
+
+        <button type="submit" className="rh-btn rh-btn-primary rh-btn-block" disabled={submitting}>
+          {submitting ? "Logging in…" : "Log in"}
+        </button>
+      </form>
+
+      <p className="text-center rh-subtle mt-4 mb-0">
+        New to RunHer?{" "}
+        <Link to="/register" className="fw-semibold" style={{ color: "var(--rh-pink-dark)" }}>
+          Create an account
+        </Link>
+      </p>
+    </AuthLayout>
   );
 };
 

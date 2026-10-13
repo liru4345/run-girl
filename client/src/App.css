@@ -329,6 +329,83 @@
   display: inline-flex;
 }
 
+/* Landing page */
+.rh-hero-title {
+  font-size: clamp(2.4rem, 5vw, 3.6rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--rh-ink);
+}
+.rh-hero-visual { position: relative; padding: 0 12px; }
+.rh-hero-photo {
+  width: 100%;
+  height: 440px;
+  object-fit: cover;
+  border-radius: 28px;
+  box-shadow: 0 20px 50px rgba(255, 105, 180, 0.25);
+}
+.rh-float-card {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border-radius: 14px;
+  padding: 10px 14px;
+  box-shadow: 0 10px 30px rgba(31, 31, 41, 0.15);
+}
+.rh-float-icon, .rh-feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--rh-pink-soft);
+  color: var(--rh-pink);
+  flex-shrink: 0;
+}
+.rh-float-icon { width: 32px; height: 32px; font-size: 0.85rem; }
+.rh-feature-icon { width: 48px; height: 48px; font-size: 1.2rem; }
+.rh-step-number {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--rh-pink);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Log in / Register */
+.rh-auth-panel {
+  background: linear-gradient(160deg, #ff69b4 0%, #ff8fab 55%, #ffb38a 100%);
+  color: #fff;
+  min-height: 560px;
+}
+.rh-auth-points li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  font-weight: 500;
+}
+.rh-auth-points svg {
+  width: 32px;
+  height: 32px;
+  padding: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  flex-shrink: 0;
+}
+
+@media (max-width: 576px) {
+  .rh-hero-photo { height: 300px; }
+  .rh-float-card { display: none; }
+}
+
 /* Feed post card */
 .rh-post .rh-stats { border-top: 1px solid var(--rh-line); }
 

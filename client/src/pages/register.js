@@ -1,4 +1,7 @@
 import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { FaEnvelope, FaLock, FaPhoneAlt } from "react-icons/fa";
+import AuthLayout from "../components/authLayout";
 
 const Register = () => {
   const [form, setForm] = useState({
@@ -8,6 +11,9 @@ const Register = () => {
     phone_number: "",
     password: "",
   });
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -15,6 +21,8 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    setSubmitting(true);
 
     try {
       const res = await fetch("/api/register", {
@@ -27,116 +35,140 @@ const Register = () => {
 
       const data = await res.json();
 
-      if (res.ok) {
-        alert(data.message);
-        // You could also navigate to login:
-        // window.location.href = '/login';
-      } else {
-        alert(data.error || "Registration failed");
+      if (!res.ok) {
+        setError(data.error || "Registration failed");
+        return;
       }
+
+      // Log straight in so new runners land in the app instead of back on a login form.
+      const loginRes = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email: form.email, password: form.password }),
+      });
+      navigate(loginRes.ok ? "/friends" : "/login");
     } catch (err) {
       console.error("❌ Submission Error:", err);
-      alert("Something went wrong");
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="container mt-5">
-      <div className="row justify-content-center">
-        <div className="col-md-6">
-          <div className="card shadow p-4">
-            <h2 className="text-center mb-4 text-primary">Sign Up</h2>
-            <form onSubmit={handleSubmit}>
-              {/* First Name */}
-              <div className="mb-3">
-                <label className="form-label">First Name</label>
-                <input
-                  name="first_name"
-                  type="text"
-                  className="form-control"
-                  placeholder="Enter your first name"
-                  required
-                  value={form.first_name}
-                  onChange={handleChange}
-                />
-              </div>
-
-              {/* Last Name */}
-              <div className="mb-3">
-                <label className="form-label">Last Name</label>
-                <input
-                  name="last_name"
-                  type="text"
-                  className="form-control"
-                  placeholder="Enter your last name"
-                  required
-                  value={form.last_name}
-                  onChange={handleChange}
-                />
-              </div>
-
-              {/* Email */}
-              <div className="mb-3">
-                <label className="form-label">Email address</label>
-                <input
-                  name="email"
-                  type="email"
-                  className="form-control"
-                  placeholder="Enter email"
-                  required
-                  value={form.email}
-                  onChange={handleChange}
-                />
-              </div>
-
-              {/* Phone Number */}
-              <div className="mb-3">
-                <label className="form-label">Phone Number</label>
-                <input
-                  name="phone_number"
-                  type="tel"
-                  className="form-control"
-                  placeholder="Enter Phone Number"
-                  required
-                  pattern="^(\+?\d{1,2}\s?)?(\(?\d{3}\)?[\s-]?)?\d{3}[\s-]?\d{4}$"
-                  title="Enter a valid phone number (e.g. 123-456-7890 or (123) 456-7890)"
-                  value={form.phone_number}
-                  onChange={handleChange}
-                />
-              </div>
-
-              {/* Password */}
-              <div className="mb-3">
-                <label className="form-label">Password</label>
-                <input
-                  name="password"
-                  type="password"
-                  className="form-control"
-                  placeholder="Enter password"
-                  required
-                  value={form.password}
-                  onChange={handleChange}
-                />
-              </div>
-
-              {/* Terms & Conditions */}
-              <div className="mb-3 form-check">
-                <input type="checkbox" className="form-check-input" id="terms" required />
-                <label className="form-check-label" htmlFor="terms">
-                  I agree to the Terms & Conditions
-                </label>
-              </div>
-
-              <button type="submit" className="btn btn-primary w-100">Sign Up</button>
-            </form>
-
-            <p className="text-center mt-3">
-              Already have an account? <a href="/login" className="text-primary">Login</a>
-            </p>
+    <AuthLayout title="Create your account" subtitle="Join RunHer and never run without backup.">
+      <form onSubmit={handleSubmit}>
+        <div className="row g-3 mb-3">
+          <div className="col-6">
+            <label className="rh-label mb-1" htmlFor="reg-first">First name</label>
+            <input
+              id="reg-first"
+              name="first_name"
+              type="text"
+              className="form-control rh-input"
+              placeholder="First"
+              autoComplete="given-name"
+              required
+              value={form.first_name}
+              onChange={handleChange}
+            />
+          </div>
+          <div className="col-6">
+            <label className="rh-label mb-1" htmlFor="reg-last">Last name</label>
+            <input
+              id="reg-last"
+              name="last_name"
+              type="text"
+              className="form-control rh-input"
+              placeholder="Last"
+              autoComplete="family-name"
+              required
+              value={form.last_name}
+              onChange={handleChange}
+            />
           </div>
         </div>
-      </div>
-    </div>
+
+        <div className="mb-3">
+          <label className="rh-label mb-1" htmlFor="reg-email">Email</label>
+          <div className="rh-input-icon">
+            <FaEnvelope />
+            <input
+              id="reg-email"
+              name="email"
+              type="email"
+              className="form-control rh-input"
+              placeholder="you@example.com"
+              autoComplete="email"
+              required
+              value={form.email}
+              onChange={handleChange}
+            />
+          </div>
+        </div>
+
+        <div className="mb-3">
+          <label className="rh-label mb-1" htmlFor="reg-phone">Phone number</label>
+          <div className="rh-input-icon">
+            <FaPhoneAlt />
+            <input
+              id="reg-phone"
+              name="phone_number"
+              type="tel"
+              className="form-control rh-input"
+              placeholder="303-555-0123"
+              autoComplete="tel"
+              required
+              pattern="^(\+?\d{1,2}\s?)?(\(?\d{3}\)?[\s-]?)?\d{3}[\s-]?\d{4}$"
+              title="Enter a valid phone number (e.g. 123-456-7890 or (123) 456-7890)"
+              value={form.phone_number}
+              onChange={handleChange}
+            />
+          </div>
+          <small className="rh-subtle">Only shown to friends you pick as watchers, so they can call you.</small>
+        </div>
+
+        <div className="mb-3">
+          <label className="rh-label mb-1" htmlFor="reg-password">Password</label>
+          <div className="rh-input-icon">
+            <FaLock />
+            <input
+              id="reg-password"
+              name="password"
+              type="password"
+              className="form-control rh-input"
+              placeholder="At least 8 characters"
+              autoComplete="new-password"
+              minLength={8}
+              required
+              value={form.password}
+              onChange={handleChange}
+            />
+          </div>
+        </div>
+
+        <div className="mb-4 form-check">
+          <input type="checkbox" className="form-check-input" id="terms" required />
+          <label className="form-check-label rh-subtle" htmlFor="terms">
+            I agree to the Terms &amp; Conditions
+          </label>
+        </div>
+
+        {error && <div className="rh-notice error mb-3" role="alert">{error}</div>}
+
+        <button type="submit" className="rh-btn rh-btn-primary rh-btn-block" disabled={submitting}>
+          {submitting ? "Creating your account…" : "Create account"}
+        </button>
+      </form>
+
+      <p className="text-center rh-subtle mt-4 mb-0">
+        Already have an account?{" "}
+        <Link to="/login" className="fw-semibold" style={{ color: "var(--rh-pink-dark)" }}>
+          Log in
+        </Link>
+      </p>
+    </AuthLayout>
   );
 };
 
