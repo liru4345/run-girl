@@ -22,7 +22,7 @@ stateDiagram-v2
     overdue --> completed: finish run
 ```
 
-The overdue check runs on the server every minute (`server/safety.js`), so alerts still go out if the runner's phone dies or the app is closed. Each step claims its runs with a single `UPDATE ... RETURNING` statement, so an alert is sent exactly once even if checks overlap or several server instances are running.
+The overdue check runs on the server every 15 seconds (`server/safety.js`), so alerts still go out if the runner's phone dies or the app is closed. Each step claims its runs with a single `UPDATE ... RETURNING` statement, so an alert is sent exactly once even if checks overlap or several server instances are running.
 
 ## Tech stack
 
