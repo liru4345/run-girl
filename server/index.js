@@ -171,6 +171,7 @@ app.post('/api/login', async (req, res) => {
       first_name: user.first_name,
       last_name: user.last_name,
       profile_picture: user.profile_picture,
+      phone_number: user.phone_number,
       bio: user.bio
     };
     console.log('✅ Session set:', req.session.user);
