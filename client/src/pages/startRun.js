@@ -230,7 +230,8 @@ const StartRun = () => {
         setSelectedFriends([]);
         showNotice(action === 'post' ? 'Run posted to your feed! 🎉' : 'Run saved to your profile.');
       } else {
-        showNotice('Failed to save your run. Please try again.', 'error');
+        const body = await res.json().catch(() => ({}));
+        showNotice(body.error || 'Failed to save your run. Please try again.', 'error');
       }
     } catch (err) {
       console.error('Error saving run:', err);

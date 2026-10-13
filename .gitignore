@@ -35,3 +35,12 @@ dump.rdb
 
 # Ruby version (local tooling)
 mobile/.ruby-version
+
+# User-uploaded photos live on the server (and in cloud storage in production), never in git
+uploads/*
+!uploads/.gitkeep
+
+# Local editor and Finder files
+.vscode/
+*.fileloc
+*.textClipping

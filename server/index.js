@@ -2,9 +2,7 @@
 // <!-- Section 1 : Import Dependencies -->
 // *****************************************************
 const express = require('express');
-const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const app = express();
 const pgp = require('pg-promise')();
 const bodyParser = require('body-parser');
@@ -860,29 +858,25 @@ app.get('/api/posts/user/:id', async (req, res) => {
 
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-// Create uploads directory if needed
+// Photo uploads are resized, compressed, and stripped of metadata before saving (see images.js).
+const { handleUpload, saveImage, deleteImage, ImageError } = require('./images');
 
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
-
-// Set up multer storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
-  filename: (req, file, cb) => {
-    const uniqueName = Date.now() + '-' + file.originalname;
-    cb(null, uniqueName);
-  },
-});
-// Only accept image formats every browser can display (e.g. iPhone HEIC photos won't show in Chrome).
-const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const upload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => cb(null, ALLOWED_IMAGE_TYPES.includes(file.mimetype)),
-});
+// Process an uploaded photo, or reply with a friendly 400 if it isn't a usable image.
+async function processUpload(req, res, preset) {
+  if (!req.file) return { path: null };
+  try {
+    return { path: await saveImage(req.file, preset) };
+  } catch (err) {
+    if (err instanceof ImageError) {
+      res.status(400).json({ error: err.message });
+      return { failed: true };
+    }
+    throw err;
+  }
+}
 
 // Finish a run: save the recap post, close out the run, and tell that run's watchers.
-app.post('/api/runs/finish', upload.single('photo'), async (req, res) => {
+app.post('/api/runs/finish', handleUpload('photo'), async (req, res) => {
   const userId = req.session.user?.id;
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -896,7 +890,9 @@ app.post('/api/runs/finish', upload.single('photo'), async (req, res) => {
   } = req.body;
 
   const visibility = action === 'post' ? 'public' : 'private';
-  const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
+  const photo = await processUpload(req, res, 'post');
+  if (photo.failed) return;
+  const imagePath = photo.path;
   const pace = miles && duration_seconds ? duration_seconds / miles : null;
 
   try {
@@ -937,14 +933,18 @@ app.post('/api/runs/finish', upload.single('photo'), async (req, res) => {
 });
 
 // Profile update endpoint
-app.post('/api/profile/update', upload.single('profile_picture'), async (req, res) => {
+app.post('/api/profile/update', handleUpload('profile_picture'), async (req, res) => {
   const userId = req.session.user?.id;
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
   const { first_name, last_name, email, phone_number, bio } = req.body;
-  const profile_picture = req.file ? `/uploads/${req.file.filename}` : null;
+  const photo = await processUpload(req, res, 'avatar');
+  if (photo.failed) return;
+  const profile_picture = photo.path;
 
   try {
+    const previous = await db.one('SELECT profile_picture FROM users WHERE id = $1', [userId]);
+
     // Update query (only update profile_picture if a new one is uploaded)
     const updateFields = [
       'first_name = $1',
@@ -965,6 +965,11 @@ app.post('/api/profile/update', upload.single('profile_picture'), async (req, re
       `UPDATE users SET ${updateFields.join(', ')} WHERE id = $${updateValues.length + 1}`,
       [...updateValues, userId]
     );
+
+    // The old profile picture is no longer used anywhere, so remove the file.
+    if (profile_picture && previous.profile_picture !== profile_picture) {
+      await deleteImage(previous.profile_picture);
+    }
 
     // Fetch updated user info + follower/following counts
     const updatedUser = await db.one(`
