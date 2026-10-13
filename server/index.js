@@ -666,41 +666,48 @@ app.post('/api/runs/:id/location', async (req, res) => {
   }
 });
 
-// "I'm OK" check-in: extends the run and cancels any pending alert.
+// Check in or extend a run. Adds time to whatever is left (or to now, if the run is already
+// past its planned end), cancels any pending alert, and keeps watchers in the loop.
 app.post('/api/runs/:id/checkin', async (req, res) => {
   const userId = req.session.user?.id;
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
   const extraMinutes = Number(req.body.extra_minutes || 10);
-  if (!Number.isInteger(extraMinutes) || extraMinutes < 1 || extraMinutes > 60) {
-    return res.status(400).json({ error: 'extra_minutes must be between 1 and 60' });
+  if (!Number.isInteger(extraMinutes) || extraMinutes < 1 || extraMinutes > 120) {
+    return res.status(400).json({ error: 'extra_minutes must be between 1 and 120' });
   }
 
   try {
     const run = await db.oneOrNone(`
       UPDATE runs r
-      SET end_time = NOW() + ($3 * INTERVAL '1 minute'),
+      SET end_time = GREATEST(old.end_time, NOW()) + ($3 * INTERVAL '1 minute'),
           status = 'in_progress',
           checkin_sent_at = NULL,
           overdue_alert_sent_at = NULL
       FROM runs old
       WHERE r.id = old.id AND r.id = $1 AND r.user_id = $2 AND r.status IN ('in_progress', 'overdue')
-      RETURNING r.end_time, old.status AS previous_status
+      RETURNING r.end_time, old.status AS previous_status, old.end_time > NOW() AS was_on_time
     `, [req.params.id, userId, extraMinutes]);
 
     if (!run) return res.status(404).json({ error: 'No active run found' });
 
     // If watchers were already alerted, let them know the runner is OK.
+    // If the runner extended ahead of time, let them know to expect them later.
+    const runner = req.session.user;
+    let update = null;
     if (run.previous_status === 'overdue') {
+      update = { message: 'checked in and is OK.', smsText: `✅ ${runner.first_name} checked in and is OK.` };
+    } else if (run.was_on_time) {
+      update = {
+        message: `added ${extraMinutes} minutes to their run.`,
+        smsText: `${runner.first_name} added ${extraMinutes} minutes to their run.`,
+      };
+    }
+
+    if (update) {
       const watchers = await getRunWatchers(req.params.id);
       for (const watcher of watchers) {
-        await notify({
-          to: watcher,
-          from: req.session.user,
-          runId: Number(req.params.id),
-          message: 'checked in and is OK.',
-          smsText: `✅ ${req.session.user.first_name} checked in and is OK.`,
-        });
+        await notify({ to: watcher, from: runner, runId: Number(req.params.id), ...update });
       }
     }
 

@@ -29,6 +29,8 @@ const StartRun = () => {
   const [miles, setMiles] = useState('');
   const [description, setDescription] = useState('');
   const [photo, setPhoto] = useState(null);
+  const [showExtend, setShowExtend] = useState(false);
+  const [extendMinutes, setExtendMinutes] = useState(10);
 
   const watchIdRef = useRef(null);
   const latestPositionRef = useRef(null);
@@ -167,6 +169,17 @@ const StartRun = () => {
     return () => window.removeEventListener(RUN_UPDATED_EVENT, onRunUpdated);
   }, []);
 
+  // Add time while still running, e.g. when you realize you won't be back on time.
+  const handleExtend = async () => {
+    try {
+      const { end_time } = await checkInRun(activeRun.id, extendMinutes);
+      setShowExtend(false);
+      setStatus(`⏱ Added ${extendMinutes} minutes. You're now expected back by ${new Date(end_time).toLocaleTimeString()}.`);
+    } catch (err) {
+      setStatus(`❌ Couldn't extend your run: ${err.message}`);
+    }
+  };
+
   const handleFinishRun = () => {
     setFinalSeconds(Math.round((Date.now() - new Date(activeRun.start_time)) / 1000));
     setShowRecap(true);
@@ -289,7 +302,40 @@ const StartRun = () => {
                   </div>
                 </div>
               ) : (
-                <p className="text-muted">Expected back in {formatClock(remainingSeconds)}</p>
+                <p className="text-muted mb-1">Expected back in {formatClock(remainingSeconds)}</p>
+              )}
+
+              {!isPastDue && !showExtend && (
+                <button className="btn btn-link btn-sm" onClick={() => setShowExtend(true)}>
+                  ⏱ Need more time? Extend run
+                </button>
+              )}
+              {showExtend && (
+                <div className="card p-3 my-3 text-start mx-auto" style={{ maxWidth: 360 }}>
+                  <label className="form-label mb-1">
+                    Add <strong>{extendMinutes} min</strong> to your run
+                  </label>
+                  <input
+                    type="range"
+                    min={5}
+                    max={60}
+                    step={5}
+                    value={extendMinutes}
+                    onChange={(e) => setExtendMinutes(Number(e.target.value))}
+                    className="form-range"
+                  />
+                  <small className="text-muted mb-2">
+                    New expected time: {new Date(new Date(activeRun.end_time).getTime() + extendMinutes * 60000).toLocaleTimeString()}
+                  </small>
+                  <div className="d-flex gap-2">
+                    <button className="btn btn-primary btn-sm" onClick={handleExtend}>
+                      Add {extendMinutes} minutes
+                    </button>
+                    <button className="btn btn-outline-secondary btn-sm" onClick={() => setShowExtend(false)}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
               )}
 
               {locationStatus && (
