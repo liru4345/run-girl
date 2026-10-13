@@ -11,11 +11,11 @@ VALUES
 -- FRIENDS
 INSERT INTO friends (user_id, friend_id, status)
 VALUES
-(1, 2, 'accepted'),
-(1, 3, 'accepted'),
-(2, 3, 'pending'),
-(3, 4, 'accepted'),
-(4, 5, 'pending');
+(1, 2, 'following'),
+(1, 3, 'following'),
+(2, 3, 'requested'),
+(3, 4, 'following'),
+(4, 5, 'requested');
 
 -- POSTS
 INSERT INTO posts (user_id, content, image, miles, duration_seconds, location, visibility, pace_seconds_per_mile)
