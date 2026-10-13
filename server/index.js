@@ -497,7 +497,7 @@ app.get('/api/notifications/live', async (req, res) => {
     const [notifications, summary] = await Promise.all([
       Number.isInteger(after)
         ? db.any(`
-            SELECT n.id, n.message, n.type, n.run_id, n.scheduled_run_id, n.created_at,
+            SELECT n.id, n.message, n.type, n.run_id, n.scheduled_run_id, n.post_id, n.created_at,
                    COALESCE(n.sender_username, u.first_name || ' ' || u.last_name) AS sender_username,
                    COALESCE(n.profile_icon, u.profile_picture) AS profile_icon
             FROM notifications n
@@ -809,6 +809,12 @@ app.get('/api/runs/:id/track', async (req, res) => {
 // Backend: Add a POST endpoint to create a new post with run recap
 
 
+// Like and comment counts for a post aliased as p, from the viewer's point of view.
+const postEngagement = (viewerParam) => `
+  (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id)::int AS like_count,
+  (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id)::int AS comment_count,
+  EXISTS (SELECT 1 FROM likes l WHERE l.post_id = p.id AND l.user_id = ${viewerParam}) AS liked_by_me`;
+
 // Get public or private posts
 app.get('/api/posts/:visibility', async (req, res) => {
   const userId = req.session.user?.id;
@@ -820,7 +826,8 @@ app.get('/api/posts/:visibility', async (req, res) => {
 
   try {
     const posts = await db.any(
-      `SELECT * FROM posts WHERE user_id = $1 AND visibility = $2 ORDER BY created_at DESC`,
+      `SELECT p.*, ${postEngagement('$1')}
+       FROM posts p WHERE p.user_id = $1 AND p.visibility = $2 ORDER BY p.created_at DESC`,
       [userId, visibility]
     );
     res.json(posts);
@@ -833,6 +840,8 @@ app.get('/api/posts/:visibility', async (req, res) => {
 // Get posts for a specific user (only public)
 // Get public posts for a specific user
 app.get('/api/posts/user/:id', async (req, res) => {
+  const me = req.session.user?.id;
+  if (!me) return res.status(401).json({ error: 'Unauthorized' });
   const profileUserId = parseInt(req.params.id);
 
   if (isNaN(profileUserId)) {
@@ -841,11 +850,11 @@ app.get('/api/posts/user/:id', async (req, res) => {
 
   try {
     const posts = await db.any(
-      `SELECT * FROM posts 
-       WHERE user_id = $1 
-       AND visibility = 'public' 
-       ORDER BY created_at DESC`,
-      [profileUserId]
+      `SELECT p.*, ${postEngagement('$2')}
+       FROM posts p
+       WHERE p.user_id = $1 AND p.visibility = 'public'
+       ORDER BY p.created_at DESC`,
+      [profileUserId, me]
     );
 
     res.json(posts);
@@ -1063,18 +1072,14 @@ app.get('/api/feed', async (req, res) => {
 
   try {
     const posts = await db.any(`
-      SELECT 
-        posts.*, 
-        users.first_name, 
-        users.last_name, 
-        users.profile_picture
-      FROM posts
-      JOIN users ON posts.user_id = users.id
-      WHERE posts.visibility = 'public' 
-        AND posts.user_id IN (
+      SELECT p.*, u.first_name, u.last_name, u.profile_picture, ${postEngagement('$1')}
+      FROM posts p
+      JOIN users u ON p.user_id = u.id
+      WHERE p.visibility = 'public'
+        AND p.user_id IN (
           SELECT friend_id FROM friends WHERE user_id = $1 AND status = 'following'
         )
-      ORDER BY posts.created_at DESC
+      ORDER BY p.created_at DESC
     `, [userId]);
 
     res.json(posts);
@@ -1343,7 +1348,7 @@ app.get('/api/posts/item/:id', async (req, res) => {
 
   try {
     const post = await db.oneOrNone(`
-      SELECT p.*, u.first_name, u.last_name, u.profile_picture
+      SELECT p.*, u.first_name, u.last_name, u.profile_picture, ${postEngagement('$2')}
       FROM posts p JOIN users u ON u.id = p.user_id
       WHERE p.id = $1
         AND (p.user_id = $2 OR (p.visibility = 'public' AND EXISTS (
@@ -1358,6 +1363,142 @@ app.get('/api/posts/item/:id', async (req, res) => {
   }
 });
 
+
+// *****************************************************
+// <!-- Likes and comments -->
+// *****************************************************
+// A post the viewer is allowed to see: their own, or a public post from someone they follow.
+function findViewablePost(postId, viewerId) {
+  return db.oneOrNone(`
+    SELECT p.id, p.user_id, p.location
+    FROM posts p
+    WHERE p.id = $1
+      AND (p.user_id = $2 OR (p.visibility = 'public' AND EXISTS (
+        SELECT 1 FROM friends WHERE user_id = $2 AND friend_id = p.user_id AND status = 'following'
+      )))
+  `, [postId, viewerId]);
+}
+
+const truncate = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
+
+// Like or unlike a post. Returns the new state so the UI can stay in sync.
+app.post('/api/posts/:id/like', async (req, res) => {
+  const me = req.session.user;
+  if (!me) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const post = await findViewablePost(req.params.id, me.id);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    const added = await db.oneOrNone(`
+      INSERT INTO likes (post_id, user_id) VALUES ($1, $2)
+      ON CONFLICT (post_id, user_id) DO NOTHING
+      RETURNING id
+    `, [post.id, me.id]);
+    if (!added) {
+      await db.none(`DELETE FROM likes WHERE post_id = $1 AND user_id = $2`, [post.id, me.id]);
+    } else if (post.user_id !== me.id) {
+      await notify({
+        to: { id: post.user_id },
+        from: me,
+        postId: post.id,
+        type: 'general',
+        message: 'liked your run. ❤️',
+        smsText: `${me.first_name} liked your run.`,
+      });
+    }
+
+    const { count } = await db.one(`SELECT COUNT(*)::int AS count FROM likes WHERE post_id = $1`, [post.id]);
+    res.json({ liked: Boolean(added), like_count: count });
+  } catch (err) {
+    console.error('❌ Error liking post:', err);
+    res.status(500).json({ error: 'Failed to like post' });
+  }
+});
+
+app.get('/api/posts/:id/comments', async (req, res) => {
+  const me = req.session.user?.id;
+  if (!me) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const post = await findViewablePost(req.params.id, me);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    const comments = await db.any(`
+      SELECT c.id, c.content, c.created_at, c.user_id,
+             u.first_name, u.last_name, u.profile_picture,
+             (c.user_id = $2 OR $3) AS can_delete
+      FROM comments c JOIN users u ON u.id = c.user_id
+      WHERE c.post_id = $1
+      ORDER BY c.created_at
+    `, [post.id, me, post.user_id === me]);
+    res.json(comments);
+  } catch (err) {
+    console.error('❌ Error loading comments:', err);
+    res.status(500).json({ error: 'Failed to load comments' });
+  }
+});
+
+app.post('/api/posts/:id/comments', async (req, res) => {
+  const me = req.session.user;
+  if (!me) return res.status(401).json({ error: 'Unauthorized' });
+
+  const content = (req.body.content || '').trim();
+  if (!content) return res.status(400).json({ error: 'Write something first' });
+  if (content.length > 500) return res.status(400).json({ error: 'Comments can be up to 500 characters' });
+
+  try {
+    const post = await findViewablePost(req.params.id, me.id);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    const comment = await db.one(`
+      INSERT INTO comments (post_id, user_id, content) VALUES ($1, $2, $3)
+      RETURNING id, content, created_at, user_id
+    `, [post.id, me.id, content]);
+
+    if (post.user_id !== me.id) {
+      await notify({
+        to: { id: post.user_id },
+        from: me,
+        postId: post.id,
+        type: 'general',
+        message: `commented on your run: "${truncate(content, 80)}"`,
+        smsText: `${me.first_name} commented on your run: "${truncate(content, 80)}"`,
+      });
+    }
+
+    res.status(201).json({
+      ...comment,
+      first_name: me.first_name,
+      last_name: me.last_name,
+      profile_picture: me.profile_picture,
+      can_delete: true,
+    });
+  } catch (err) {
+    console.error('❌ Error adding comment:', err);
+    res.status(500).json({ error: 'Failed to add comment' });
+  }
+});
+
+// Comment authors can delete their comments, and post owners can delete any comment on their post.
+app.delete('/api/comments/:id', async (req, res) => {
+  const me = req.session.user?.id;
+  if (!me) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const deleted = await db.oneOrNone(`
+      DELETE FROM comments c
+      USING posts p
+      WHERE c.id = $1 AND p.id = c.post_id AND (c.user_id = $2 OR p.user_id = $2)
+      RETURNING c.id
+    `, [req.params.id, me]);
+    if (!deleted) return res.status(404).json({ error: 'Comment not found' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('❌ Error deleting comment:', err);
+    res.status(500).json({ error: 'Failed to delete comment' });
+  }
+});
 
 // *****************************************************
 // <!-- Dev Route: Create Test Friends and Requests -->

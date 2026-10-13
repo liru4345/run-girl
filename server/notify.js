@@ -15,13 +15,14 @@ function createNotifier(db) {
    * @param {string} opts.smsText  full text-message version
    * @param {number} [opts.runId]           a live run this is about
    * @param {number} [opts.scheduledRunId]  a planned run this is about
+   * @param {number} [opts.postId]          a post this is about (likes, comments)
    * @param {'run'|'run_alert'} [opts.type]  run_alert is shown as urgent
    */
-  return async function notify({ to, from, message, smsText, runId = null, scheduledRunId = null, type = 'run' }) {
+  return async function notify({ to, from, message, smsText, runId = null, scheduledRunId = null, postId = null, type = 'run' }) {
     try {
       await db.none(`
-        INSERT INTO notifications (sender_id, receiver_id, sender_username, profile_icon, message, type, run_id, scheduled_run_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO notifications (sender_id, receiver_id, sender_username, profile_icon, message, type, run_id, scheduled_run_id, post_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       `, [
         from?.id ?? null,
         to.id,
@@ -31,12 +32,13 @@ function createNotifier(db) {
         type,
         runId,
         scheduledRunId,
+        postId,
       ]);
     } catch (err) {
       console.error(`❌ Failed to save notification for user ${to.id}:`, err.message);
     }
 
-    if (SMS_ENABLED) {
+    if (SMS_ENABLED && to.phone_number) {
       await sendSms(to.phone_number, smsText);
     }
   };

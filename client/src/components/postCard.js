@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { FaMapMarkerAlt, FaLock } from "react-icons/fa";
 import Avatar from "./avatar";
+import PostEngagement from "./postEngagement";
+import { timeAgo } from "../timeAgo";
 
 // A run post, styled like a social feed card. Used on the feed and on profiles.
 
@@ -19,16 +21,9 @@ const formatPace = (paceSeconds) => {
   return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}/mi`;
 };
 
-export const timeAgo = (timestamp) => {
-  const seconds = Math.round((Date.now() - new Date(timestamp)) / 1000);
-  if (seconds < 60) return "just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-  return new Date(timestamp).toLocaleDateString([], { month: "short", day: "numeric" });
-};
+export { timeAgo } from "../timeAgo";
 
-const PostCard = ({ post, author }) => {
+const PostCard = ({ post, author, showComments = false }) => {
   const [imageFailed, setImageFailed] = useState(false);
   const person = author || post;
   const miles = Number(post.miles);
@@ -87,6 +82,8 @@ const PostCard = ({ post, author }) => {
           <div className="rh-stat-value">{formatPace(post.pace_seconds_per_mile)}</div>
         </div>
       </div>
+
+      <PostEngagement post={post} startOpen={showComments} />
     </article>
   );
 };

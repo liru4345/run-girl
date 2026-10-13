@@ -32,7 +32,7 @@ const PostView = () => {
         </div>
       )}
       {!post && !error && <p className="rh-subtle text-center">Loading…</p>}
-      {post && <PostCard post={post} />}
+      {post && <PostCard post={post} showComments />}
     </div>
   );
 };

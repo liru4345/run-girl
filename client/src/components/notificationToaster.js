@@ -64,7 +64,8 @@ const NotificationToaster = () => {
     });
     systemNotification.onclick = () => {
       window.focus();
-      if (n.scheduled_run_id) navigate(`/calender?run=${n.scheduled_run_id}`);
+      if (n.post_id) navigate(`/post/${n.post_id}`);
+      else if (n.scheduled_run_id) navigate(`/calender?run=${n.scheduled_run_id}`);
       else if (n.run_id) navigate(linkFor(n));
       systemNotification.close();
     };
@@ -183,6 +184,11 @@ const NotificationToaster = () => {
                   {n.type === "follow_request" && (
                     <Link to="/notifications" className="btn btn-sm btn-outline-primary mt-2" onClick={() => dismissToast(n.id)}>
                       Review request
+                    </Link>
+                  )}
+                  {n.post_id && (
+                    <Link to={`/post/${n.post_id}`} className="btn btn-sm btn-outline-primary mt-2" onClick={() => dismissToast(n.id)}>
+                      View post
                     </Link>
                   )}
                   {n.scheduled_run_id && (

@@ -146,3 +146,6 @@ CREATE INDEX IF NOT EXISTS idx_sra_user ON scheduled_run_attendees (user_id);
 
 -- Notifications about a planned run link to it (added last because scheduled_runs is created above)
 ALTER TABLE notifications ADD COLUMN IF NOT EXISTS scheduled_run_id INTEGER REFERENCES scheduled_runs(id) ON DELETE CASCADE;
+
+-- Like and comment notifications link to the post
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE;

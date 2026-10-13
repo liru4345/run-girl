@@ -134,6 +134,11 @@ const Notifications = () => {
                       )}
                     </div>
                   )}
+                  {notif.post_id && (
+                    <Link to={`/post/${notif.post_id}`} className="rh-btn rh-btn-secondary mt-2" style={{ padding: '6px 14px' }}>
+                      View post
+                    </Link>
+                  )}
                   {notif.scheduled_run_id && (
                     <Link
                       to={`/calender?run=${notif.scheduled_run_id}`}
