@@ -659,7 +659,7 @@ app.get('/api/runs/watching', async (req, res) => {
 
   try {
     const runs = await db.any(`
-      SELECT r.id, r.status, r.location, r.end_time, u.first_name, u.last_name, u.profile_picture
+      SELECT r.id, r.status, r.location, r.end_time, u.first_name, u.last_name, u.profile_picture, u.phone_number
       FROM run_watchers rw
       JOIN runs r ON r.id = rw.run_id
       JOIN users u ON u.id = r.user_id
@@ -681,7 +681,8 @@ app.get('/api/runs/:id/track', async (req, res) => {
   try {
     const run = await db.oneOrNone(`
       SELECT r.id, r.user_id, r.location, r.start_time, r.end_time, r.finished_at, r.status,
-             r.last_lat, r.last_lng, r.last_location_at, u.first_name, u.last_name, u.profile_picture
+             r.last_lat, r.last_lng, r.last_location_at, u.first_name, u.last_name, u.profile_picture,
+             u.phone_number
       FROM runs r
       JOIN users u ON u.id = r.user_id
       WHERE r.id = $1
@@ -691,8 +692,13 @@ app.get('/api/runs/:id/track', async (req, res) => {
     `, [req.params.id, userId]);
 
     if (!run) return res.status(404).json({ error: 'Run not found' });
+
+    // Only watchers get the runner's phone number, so they can call if something's wrong.
+    const { phone_number, ...runInfo } = run;
+    const isWatcher = run.user_id !== userId;
     res.json({
-      ...run,
+      ...runInfo,
+      phone_number: isWatcher ? phone_number : null,
       map_link: run.last_lat != null ? mapLink(run.last_lat, run.last_lng) : null,
     });
   } catch (err) {

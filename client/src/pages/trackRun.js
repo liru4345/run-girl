@@ -81,6 +81,28 @@ const TrackRun = () => {
         )}
       </ul>
 
+      {run.phone_number && (
+        <div className={`card p-3 mb-3 ${run.status === 'overdue' ? 'border-danger' : ''}`}>
+          <div className="d-flex flex-wrap align-items-center gap-2">
+            <span className="me-auto">
+              <strong>Contact {run.first_name}:</strong> {run.phone_number}
+            </span>
+            <a
+              href={`tel:${run.phone_number.replace(/[^0-9+]/g, '')}`}
+              className={`btn btn-sm ${run.status === 'overdue' ? 'btn-danger' : 'btn-outline-primary'}`}
+            >
+              📞 Call
+            </a>
+            <a
+              href={`sms:${run.phone_number.replace(/[^0-9+]/g, '')}`}
+              className="btn btn-sm btn-outline-secondary"
+            >
+              💬 Text
+            </a>
+          </div>
+        </div>
+      )}
+
       {hasLocation ? (
         <>
           <p className="text-muted small mb-1">

@@ -52,9 +52,16 @@ const WatchingBanner = () => {
                   : `is on a run at ${run.location}. Expected back by ${new Date(run.end_time).toLocaleTimeString()}.`}
               </span>
             </span>
-            <Link to={`/track/${run.id}`} className={`btn btn-sm ${overdue ? "btn-danger" : "btn-outline-primary"}`}>
-              Track
-            </Link>
+            <span className="d-flex gap-2 flex-shrink-0">
+              {overdue && run.phone_number && (
+                <a href={`tel:${run.phone_number.replace(/[^0-9+]/g, "")}`} className="btn btn-sm btn-danger">
+                  📞 Call {run.first_name}
+                </a>
+              )}
+              <Link to={`/track/${run.id}`} className={`btn btn-sm ${overdue ? "btn-outline-danger" : "btn-outline-primary"}`}>
+                Track
+              </Link>
+            </span>
           </div>
         );
       })}
