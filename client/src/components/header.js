@@ -1,26 +1,28 @@
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { FaBell } from "react-icons/fa"; // Import bell icon
 
 const Header = () => {
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
 
+  // Re-check who is logged in on every page change and whenever the tab regains focus,
+  // so the header never shows a stale user after logging in or out (including in another tab).
   useEffect(() => {
     const fetchUser = async () => {
       try {
         const res = await fetch("/api/profile", { credentials: 'include' });
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data);
-        }
+        setUser(res.ok ? await res.json() : null);
       } catch (err) {
         setUser(null); // Not logged in
       }
     };
 
     fetchUser();
-  }, []);
+    window.addEventListener("focus", fetchUser);
+    return () => window.removeEventListener("focus", fetchUser);
+  }, [pathname]);
 
   const handleLogout = async () => {
     await fetch("/api/logout", { credentials: 'include' });
