@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { FaRunning, FaMapMarkerAlt } from 'react-icons/fa';
 import 'animate.css';
+import { checkInRun, RUN_UPDATED_EVENT } from '../runActions';
 
 // How often the runner's position is sent to the server while a run is active.
 const LOCATION_PING_MS = 15000;
@@ -146,23 +147,25 @@ const StartRun = () => {
 
   const handleCheckIn = useCallback(async () => {
     try {
-      const res = await fetch(`/api/runs/${activeRun.id}/checkin`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ extra_minutes: 10 }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setActiveRun((run) => ({ ...run, end_time: data.end_time, status: 'in_progress' }));
-        setStatus('👍 Checked in. Your watchers won\'t be alerted for another 10 minutes.');
-      } else {
-        setStatus(`❌ Check-in failed: ${data.error}`);
-      }
+      await checkInRun(activeRun.id); // the RUN_UPDATED_EVENT listener updates the run
+      setStatus('👍 Checked in. Your watchers won\'t be alerted for another 10 minutes.');
     } catch (err) {
-      console.error('❌ Check-in error:', err);
+      setStatus(`❌ Check-in failed: ${err.message}`);
     }
   }, [activeRun]);
+
+  // Keep the countdown in sync when the runner checks in from a pop-up or the notifications page.
+  useEffect(() => {
+    const onRunUpdated = (e) => {
+      setActiveRun((run) =>
+        run && run.id === Number(e.detail.runId)
+          ? { ...run, end_time: e.detail.end_time, status: 'in_progress' }
+          : run
+      );
+    };
+    window.addEventListener(RUN_UPDATED_EVENT, onRunUpdated);
+    return () => window.removeEventListener(RUN_UPDATED_EVENT, onRunUpdated);
+  }, []);
 
   const handleFinishRun = () => {
     setFinalSeconds(Math.round((Date.now() - new Date(activeRun.start_time)) / 1000));

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Avatar from "./avatar";
+import { checkInRun } from "../runActions";
 
 // Live alerts: checks for new notifications every few seconds and shows them as pop-ups
 // in the app, plus a system notification when the RunHer tab is in the background.
@@ -36,6 +37,21 @@ const NotificationToaster = () => {
   const dismissToast = useCallback((id) => {
     setToasts((current) => current.filter((t) => t.id !== id));
   }, []);
+
+  // The runner's check-in reminder checks them in right from the pop-up.
+  const handleCheckIn = async (n) => {
+    const update = (changes) =>
+      setToasts((current) => current.map((t) => (t.id === n.id ? { ...t, ...changes } : t)));
+    update({ checkingIn: true });
+    try {
+      await checkInRun(n.run_id);
+      update({ checkingIn: false, resolved: true, type: "run", message: "✅ Checked in. Your watchers won't be alerted for another 10 minutes." });
+      setTimeout(() => dismissToast(n.id), 5000);
+    } catch (err) {
+      update({ checkingIn: false, resolved: true, message: "This run has already ended, so there's nothing to check in to." });
+      setTimeout(() => dismissToast(n.id), 5000);
+    }
+  };
 
   const showSystemNotification = useCallback((n) => {
     if (permission !== "granted" || !document.hidden) return;
@@ -153,13 +169,22 @@ const NotificationToaster = () => {
                     {n.sender_username !== "RunHer" && <strong>{n.sender_username} </strong>}
                     {n.message}
                   </div>
-                  {n.run_id && (
+                  {n.run_id && n.sender_username === "RunHer" && !n.resolved && (
+                    <button
+                      className="btn btn-sm btn-warning mt-2"
+                      onClick={() => handleCheckIn(n)}
+                      disabled={n.checkingIn}
+                    >
+                      {n.checkingIn ? "Checking in..." : "I'm OK, add 10 minutes"}
+                    </button>
+                  )}
+                  {n.run_id && n.sender_username !== "RunHer" && (
                     <Link
                       to={linkFor(n)}
                       className={`btn btn-sm mt-2 ${urgent ? "btn-danger" : "btn-outline-primary"}`}
                       onClick={() => dismissToast(n.id)}
                     >
-                      {n.sender_username === "RunHer" ? "Check in" : urgent ? "See where they are" : "Track"}
+                      {urgent ? "See where they are" : "Track"}
                     </Link>
                   )}
                 </div>

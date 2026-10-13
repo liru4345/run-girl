@@ -2,11 +2,22 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Avatar from '../components/avatar';
 import { UNREAD_EVENT } from '../components/notificationToaster';
+import { checkInRun } from '../runActions';
 
 const Notifications = () => {
   const [general, setGeneral] = useState([]);
   const [requests, setRequests] = useState([]);
   const [activeTab, setActiveTab] = useState('all');
+  const [checkInResults, setCheckInResults] = useState({}); // notification id -> result message
+
+  const handleCheckIn = async (notif) => {
+    try {
+      await checkInRun(notif.run_id);
+      setCheckInResults((r) => ({ ...r, [notif.id]: "✅ Checked in. Your watchers won't be alerted for another 10 minutes." }));
+    } catch (err) {
+      setCheckInResults((r) => ({ ...r, [notif.id]: 'This run has already ended.' }));
+    }
+  };
 
   useEffect(() => {
     fetch('/api/notifications')
@@ -94,13 +105,24 @@ const Notifications = () => {
                     {notif.message}
                     <br />
                     <small className="text-muted">{new Date(notif.created_at).toLocaleString()}</small>
-                    {notif.run_id && (
+                    {notif.run_id && fromRunHer && (
+                      <div className="mt-2">
+                        {checkInResults[notif.id] ? (
+                          <small>{checkInResults[notif.id]}</small>
+                        ) : (
+                          <button className="btn btn-sm btn-warning" onClick={() => handleCheckIn(notif)}>
+                            I'm OK, add 10 minutes
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {notif.run_id && !fromRunHer && (
                       <div>
                         <Link
-                          to={fromRunHer ? '/start-run' : `/track/${notif.run_id}`}
+                          to={`/track/${notif.run_id}`}
                           className={`btn btn-sm mt-2 ${urgent ? 'btn-outline-danger' : 'btn-outline-primary'}`}
                         >
-                          {fromRunHer ? 'Check in' : 'View run'}
+                          View run
                         </Link>
                       </div>
                     )}
