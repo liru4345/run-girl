@@ -37,7 +37,7 @@ The overdue check runs on the server every minute (`server/safety.js`), so alert
 ```
 client (React :3000) ──/api proxy──▶ server (Express :5001) ──▶ PostgreSQL
                                           │
-                                          ├── safety monitor (every 60s)
+                                          ├── safety monitor (every 15s)
                                           └── SMS via email-to-SMS gateway
 ```
 

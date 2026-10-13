@@ -522,8 +522,10 @@ app.post('/api/start-run', async (req, res) => {
   const { duration_minutes, location } = req.body;
   const watcherIds = Array.isArray(req.body.watcher_ids) ? req.body.watcher_ids : [];
   const minutes = Number(duration_minutes);
-  if (!location || !Number.isInteger(minutes) || minutes < 5 || minutes > 180) {
-    return res.status(400).json({ error: 'A location and a duration between 5 and 180 minutes are required' });
+  // Short runs are allowed outside production so the safety flow can be tested quickly.
+  const minMinutes = process.env.NODE_ENV === 'production' ? 5 : 1;
+  if (!location || !Number.isInteger(minutes) || minutes < minMinutes || minutes > 180) {
+    return res.status(400).json({ error: `A location and a duration between ${minMinutes} and 180 minutes are required` });
   }
 
   try {

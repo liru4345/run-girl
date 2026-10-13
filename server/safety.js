@@ -6,7 +6,7 @@
 // Each step "claims" its runs with a single UPDATE ... RETURNING, so a run is only ever
 // alerted once, even if the check overlaps with itself or several server instances run it.
 
-const CHECK_INTERVAL_MS = 60 * 1000;
+const CHECK_INTERVAL_MS = 15 * 1000;
 const GRACE_MINUTES = Number(process.env.OVERDUE_GRACE_MINUTES || 10);
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 
@@ -34,7 +34,7 @@ async function sendCheckinReminders(db, sendSms) {
     await sendSms(
       run.phone_number,
       `Hi ${run.first_name}, your RunHer run is past its planned time. Open the app to check in or finish your run, ` +
-      `or your watchers will be alerted in ${GRACE_MINUTES} minutes.`
+      `or your watchers will be alerted in ${GRACE_MINUTES} minute${GRACE_MINUTES === 1 ? '' : 's'}.`
     );
   }
   return runs.length;

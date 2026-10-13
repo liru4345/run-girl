@@ -114,7 +114,7 @@ const StartRun = () => {
     );
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (durationMinutes = runTime) => {
     try {
       const res = await fetch('/api/start-run', {
         method: 'POST',
@@ -122,7 +122,7 @@ const StartRun = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           location,
-          duration_minutes: runTime,
+          duration_minutes: durationMinutes,
           watcher_ids: selectedFriends,
         }),
       });
@@ -261,9 +261,14 @@ const StartRun = () => {
                 />
               </div>
 
-              <button className="btn btn-primary mt-3" onClick={handleSubmit}>
+              <button className="btn btn-primary mt-3" onClick={() => handleSubmit()}>
                 Begin Run
               </button>
+              {process.env.NODE_ENV === 'development' && (
+                <button className="btn btn-outline-secondary mt-3 ms-2" onClick={() => handleSubmit(2)}>
+                  ⏱ 2-min test run
+                </button>
+              )}
             </>
           ) : !showRecap && (
             <div className="text-center mt-4">

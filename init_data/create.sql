@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS runs (
   overdue_alert_sent_at TIMESTAMP          -- when watchers were alerted
 );
 
--- The safety monitor scans active runs every minute
+-- The safety monitor scans active runs every 15 seconds
 CREATE INDEX IF NOT EXISTS idx_runs_active ON runs (status, end_time);
 
 
