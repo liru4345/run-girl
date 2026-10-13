@@ -17,6 +17,8 @@ services:
     env_file: ./server/.env
     environment:
       - NODE_ENV=development
+      # Log texts instead of sending them. Run `SMS_DRY_RUN=false docker compose up -d` to send real texts.
+      - SMS_DRY_RUN=${SMS_DRY_RUN:-true}
     depends_on:
       - db
     ports:

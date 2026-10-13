@@ -80,9 +80,19 @@ CREATE TABLE IF NOT EXISTS runs (
   location TEXT NOT NULL,
   duration_minutes INTEGER NOT NULL,
   start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  end_time TIMESTAMP,  -- now just a regular column
+  end_time TIMESTAMP,                      -- expected return time; pushed back when the runner checks in
+  finished_at TIMESTAMP,                   -- when the runner actually finished
   status VARCHAR(20) DEFAULT 'in_progress'
+           CHECK (status IN ('in_progress', 'overdue', 'completed')),
+  last_lat DOUBLE PRECISION,               -- live location, updated from the runner's browser
+  last_lng DOUBLE PRECISION,
+  last_location_at TIMESTAMP,
+  checkin_sent_at TIMESTAMP,               -- when the runner was texted a check-in reminder
+  overdue_alert_sent_at TIMESTAMP          -- when watchers were alerted
 );
+
+-- The safety monitor scans active runs every minute
+CREATE INDEX IF NOT EXISTS idx_runs_active ON runs (status, end_time);
 
 
 CREATE TABLE IF NOT EXISTS run_watchers (

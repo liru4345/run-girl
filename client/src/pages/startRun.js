@@ -1,6 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { FaRunning } from 'react-icons/fa';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Link } from 'react-router-dom';
+import { FaRunning, FaMapMarkerAlt } from 'react-icons/fa';
 import 'animate.css';
+
+// How often the runner's position is sent to the server while a run is active.
+const LOCATION_PING_MS = 15000;
+
+const formatClock = (totalSeconds) => {
+  const sign = totalSeconds < 0 ? '-' : '';
+  const abs = Math.abs(totalSeconds);
+  const minutes = Math.floor(abs / 60);
+  const seconds = abs % 60;
+  return `${sign}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+};
 
 const StartRun = () => {
   const [friends, setFriends] = useState([]);
@@ -8,13 +20,19 @@ const StartRun = () => {
   const [runTime, setRunTime] = useState(30);
   const [location, setLocation] = useState('');
   const [status, setStatus] = useState('');
-  const [isRunning, setIsRunning] = useState(false);
-  const [secondsElapsed, setSecondsElapsed] = useState(0);
+  const [activeRun, setActiveRun] = useState(null); // { id, start_time, end_time, status }
+  const [now, setNow] = useState(Date.now());
+  const [locationStatus, setLocationStatus] = useState('');
   const [showRecap, setShowRecap] = useState(false);
+  const [finalSeconds, setFinalSeconds] = useState(0);
   const [miles, setMiles] = useState('');
   const [description, setDescription] = useState('');
   const [photo, setPhoto] = useState(null);
 
+  const watchIdRef = useRef(null);
+  const latestPositionRef = useRef(null);
+
+  // Load friends, defaults, and any run that's already in progress (e.g. after a page refresh).
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -25,6 +43,15 @@ const StartRun = () => {
           setRunTime(data.defaults?.duration_min || 30);
           setLocation(data.defaults?.location || '');
         }
+
+        const activeRes = await fetch('/api/runs/active', { credentials: 'include' });
+        if (activeRes.ok) {
+          const { run } = await activeRes.json();
+          if (run) {
+            setActiveRun(run);
+            setLocation(run.location);
+          }
+        }
       } catch (err) {
         console.error('❌ API error:', err);
       }
@@ -32,15 +59,54 @@ const StartRun = () => {
     fetchData();
   }, []);
 
+  // Tick once a second while running so the timer and countdown stay current.
   useEffect(() => {
-    let timer;
-    if (isRunning) {
-      timer = setInterval(() => {
-        setSecondsElapsed((prev) => prev + 1);
-      }, 1000);
-    }
+    if (!activeRun) return undefined;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [isRunning]);
+  }, [activeRun]);
+
+  // Live location sharing: watch the device position and send the latest fix every few seconds.
+  useEffect(() => {
+    if (!activeRun) return undefined;
+
+    if (!navigator.geolocation) {
+      setLocationStatus('Location sharing is not supported in this browser.');
+      return undefined;
+    }
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        latestPositionRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setLocationStatus('Sharing live location with your watchers');
+      },
+      (err) => {
+        setLocationStatus(
+          err.code === err.PERMISSION_DENIED
+            ? 'Location permission denied. Watchers will only see your planned location.'
+            : 'Waiting for location...'
+        );
+      },
+      { enableHighAccuracy: true, maximumAge: 10000 }
+    );
+
+    const sendLocation = () => {
+      const position = latestPositionRef.current;
+      if (!position) return;
+      fetch(`/api/runs/${activeRun.id}/location`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(position),
+      }).catch((err) => console.error('❌ Location update failed:', err));
+    };
+    const pinger = setInterval(sendLocation, LOCATION_PING_MS);
+
+    return () => {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      clearInterval(pinger);
+    };
+  }, [activeRun]);
 
   const toggleFriend = (id) => {
     setSelectedFriends((prev) =>
@@ -64,8 +130,11 @@ const StartRun = () => {
       const data = await res.json();
 
       if (res.ok) {
+        const activeRes = await fetch('/api/runs/active', { credentials: 'include' });
+        const { run } = await activeRes.json();
+        setActiveRun(run);
+        setNow(Date.now());
         setStatus('✅ Run started!');
-        setIsRunning(true);
       } else {
         setStatus(`❌ Failed to start run: ${data.error}`);
       }
@@ -75,16 +144,37 @@ const StartRun = () => {
     }
   };
 
+  const handleCheckIn = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/runs/${activeRun.id}/checkin`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ extra_minutes: 10 }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setActiveRun((run) => ({ ...run, end_time: data.end_time, status: 'in_progress' }));
+        setStatus('👍 Checked in. Your watchers won\'t be alerted for another 10 minutes.');
+      } else {
+        setStatus(`❌ Check-in failed: ${data.error}`);
+      }
+    } catch (err) {
+      console.error('❌ Check-in error:', err);
+    }
+  }, [activeRun]);
+
   const handleFinishRun = () => {
-    setIsRunning(false);
+    setFinalSeconds(Math.round((Date.now() - new Date(activeRun.start_time)) / 1000));
     setShowRecap(true);
     setStatus('');
   };
 
   const handleSubmitRecap = async (action) => {
     const formData = new FormData();
+    formData.append('run_id', activeRun.id);
     formData.append('location', location);
-    formData.append('duration_seconds', secondsElapsed);
+    formData.append('duration_seconds', finalSeconds);
     formData.append('miles', miles);
     formData.append('description', description);
     formData.append('action', action);
@@ -96,11 +186,14 @@ const StartRun = () => {
         credentials: 'include',
         body: formData,
       });
-      const data = await res.json();
       if (res.ok) {
         alert('✅ Run saved!');
         setShowRecap(false);
-        setSecondsElapsed(0);
+        setActiveRun(null);
+        setLocationStatus('');
+        setMiles('');
+        setDescription('');
+        setPhoto(null);
       } else {
         alert('❌ Failed to save run');
       }
@@ -109,18 +202,19 @@ const StartRun = () => {
     }
   };
 
-  const formatTime = () => {
-    const minutes = Math.floor(secondsElapsed / 60);
-    const seconds = secondsElapsed % 60;
-    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-  };
+  const elapsedSeconds = activeRun ? Math.max(0, Math.round((now - new Date(activeRun.start_time)) / 1000)) : 0;
+  const remainingSeconds = activeRun ? Math.round((new Date(activeRun.end_time) - now) / 1000) : 0;
+  const isPastDue = activeRun && remainingSeconds <= 0;
 
   return (
     <div className="container mt-5">
       <div className="row">
         {/* Friends Column */}
         <div className="col-md-5 border-end" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-          <h4>Select Friends</h4>
+          <h4>Select Watchers</h4>
+          <p className="text-muted small">
+            Watchers get a text when you start and finish, and an alert if you don't check in on time.
+          </p>
           <ul className="list-group">
             {friends.map((friend) => (
               <li key={friend.id} className="list-group-item d-flex align-items-center">
@@ -129,6 +223,7 @@ const StartRun = () => {
                   className="form-check-input me-2"
                   checked={selectedFriends.includes(friend.id)}
                   onChange={() => toggleFriend(friend.id)}
+                  disabled={!!activeRun}
                 />
                 {friend.first_name} {friend.last_name}
               </li>
@@ -140,7 +235,7 @@ const StartRun = () => {
         <div className="col-md-7">
           <h4>Run Details</h4>
 
-          {!isRunning ? (
+          {!activeRun ? (
             <>
               <div className="mb-3">
                 <label className="form-label">Duration (Minutes)</label>
@@ -170,12 +265,36 @@ const StartRun = () => {
                 Begin Run
               </button>
             </>
-          ) : (
+          ) : !showRecap && (
             <div className="text-center mt-4">
               <h5>🏃‍♀️ Running...</h5>
               <FaRunning className="text-primary display-1 animate__animated animate__pulse animate__infinite" />
-              <h2 className="mt-3">{formatTime()}</h2>
-              <button className="btn btn-success mt-3" onClick={handleFinishRun}>
+              <h2 className="mt-3">{formatClock(elapsedSeconds)}</h2>
+
+              {isPastDue ? (
+                <div className="alert alert-warning mt-3">
+                  <strong>You're past your planned time.</strong> Check in so your watchers know you're OK.
+                  <div>
+                    <button className="btn btn-warning mt-2" onClick={handleCheckIn}>
+                      I'm OK, add 10 minutes
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-muted">Expected back in {formatClock(remainingSeconds)}</p>
+              )}
+
+              {locationStatus && (
+                <p className="small text-muted">
+                  <FaMapMarkerAlt className="me-1" />
+                  {locationStatus}
+                </p>
+              )}
+              <p className="small">
+                <Link to={`/track/${activeRun.id}`}>See what your watchers see</Link>
+              </p>
+
+              <button className="btn btn-success mt-2" onClick={handleFinishRun}>
                 Run Finished
               </button>
             </div>
@@ -186,7 +305,7 @@ const StartRun = () => {
             <div className="mt-4">
               <h5>🏁 Run Recap</h5>
               <p><strong>Location:</strong> {location}</p>
-              <p><strong>Duration:</strong> {formatTime()}</p>
+              <p><strong>Duration:</strong> {formatClock(finalSeconds)}</p>
 
               <div className="mb-3">
                 <label className="form-label">Miles Ran</label>

@@ -15,6 +15,7 @@ import StartRun from "./pages/startRun";
 import UserPosts from "./pages/userPosts";
 import Feed from "./pages/feed";
 import Calender from "./pages/calender";
+import TrackRun from "./pages/trackRun";
 
 
 
@@ -41,6 +42,7 @@ function App() {
           <Route path="/posts/:id" element={<UserPosts/>} />
           <Route path="/feed" element={<Feed/>} />
           <Route path="/calender" element={<Calender/>} />
+          <Route path="/track/:id" element={<TrackRun/>} />
         </Routes>
       </div>
       <Footer />

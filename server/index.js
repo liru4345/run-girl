@@ -27,23 +27,15 @@ const dbConfig = {
 };
 const db = pgp(dbConfig);
 
-const nodemailer = require('nodemailer');
-
-const transporter = nodemailer.createTransport({
-  service: 'gmail', // Or any email provider
-  auth: {
-    user: process.env.EMAIL_USER, // Add to your .env
-    pass: process.env.EMAIL_PASS, // App password or real password
-  },
-});
-
-
+const { sendSms } = require('./sms');
+const { startSafetyMonitor, mapLink, trackingLink } = require('./safety');
 
 const connectToDatabase = async (retries = 5) => {
   while (retries) {
     try {
       await db.connect();
       console.log("✅ Database connection successful");
+      startSafetyMonitor(db, sendSms);
       break;
     } catch (err) {
       console.error("❌ Database connection failed. Retrying...", err.message);
@@ -116,6 +108,13 @@ app.post('/api/register', async (req, res) => {
     res.status(201).send({ message: 'User registered successfully' });
 
   } catch (err) {
+    console.error('❌ Registration error:', err.message);
+    if (err.code === '23505') {
+      return res.status(409).send({ error: 'An account with that email already exists' });
+    }
+    if (err.code === '22001') {
+      return res.status(400).send({ error: 'Phone number must be 15 characters or fewer' });
+    }
     res.status(500).send({ error: 'User registration failed' });
   }
 });
@@ -504,113 +503,176 @@ app.get('/api/start-run', async (req, res) => {
   }
 });
 
-/*
-app.post('/api/start-run', async (req, res) => {
-  console.log("📥 Received run:", req.body); // Add this line
-  const userId = req.session.user?.id;
-  const { duration_minutes, location, watcher_ids } = req.body;
-  const startTime = new Date();
-  const endTime = new Date(startTime.getTime() + duration_minutes * 60000); // Add minutes
-
-  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-
-  try {
-    // Step 1: Insert the run and return the ID
-    const run = await await db.one(`
-    INSERT INTO runs (user_id, location, duration_minutes, start_time, end_time)
-    VALUES ($1, $2, $3, $4, $5)
-    RETURNING id
-  `, [userId, location, duration_minutes, startTime, endTime]);
-
-    const runId = run.id;
-
-    // Step 2: Insert watchers into the run_watchers table
-    const inserts = watcher_ids.map(watcherId =>
-      db.none(
-        `INSERT INTO run_watchers (run_id, watcher_id) VALUES ($1, $2)`,
-        [runId, watcherId]
-      )
-    );
-
-    await Promise.all(inserts);
-
-    res.status(201).json({ message: 'Run started successfully', runId });
-
-  } catch (err) {
-    console.error('❌ Error starting run:', err);
-    res.status(500).json({ error: 'Something went wrong when starting the run' });
-  }
-});
-*/
-// Helper: Get carrier gateway domain
-function getCarrierGateway(carrier) {
-  const gateways = {
-    'att': 'txt.att.net',
-    'verizon': 'vtext.com',
-    'tmobile': 'tmomail.net',
-    'sprint': 'messaging.sprintpcs.com'
-    // Add more carriers if needed
-  };
-  return gateways[carrier.toLowerCase()] || 'txt.att.net';  // Default to AT&T if unknown
+// *****************************************************
+// <!-- Runs: start, live location, check-in, tracking -->
+// *****************************************************
+async function getRunWatchers(runId) {
+  return db.any(`
+    SELECT u.id, u.first_name, u.phone_number
+    FROM run_watchers rw
+    JOIN users u ON u.id = rw.watcher_id
+    WHERE rw.run_id = $1
+  `, [runId]);
 }
 
 app.post('/api/start-run', async (req, res) => {
-  console.log("📥 Received run:", req.body);
   const userId = req.session.user?.id;
-  const { duration_minutes, location, watcher_ids } = req.body;
-  const startTime = new Date();
-  const endTime = new Date(startTime.getTime() + duration_minutes * 60000);
-
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
+  const { duration_minutes, location } = req.body;
+  const watcherIds = Array.isArray(req.body.watcher_ids) ? req.body.watcher_ids : [];
+  const minutes = Number(duration_minutes);
+  if (!location || !Number.isInteger(minutes) || minutes < 5 || minutes > 180) {
+    return res.status(400).json({ error: 'A location and a duration between 5 and 180 minutes are required' });
+  }
+
   try {
-    // Step 1: Insert the run and return the ID
-    const run = await db.one(`
-      INSERT INTO runs (user_id, location, duration_minutes, start_time, end_time)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING id
-    `, [userId, location, duration_minutes, startTime, endTime]);
-
-    const runId = run.id;
-
-    // Step 2: Insert watchers into the run_watchers table
-    const inserts = watcher_ids.map(watcherId =>
-      db.none(`INSERT INTO run_watchers (run_id, watcher_id) VALUES ($1, $2)`, [runId, watcherId])
+    const active = await db.oneOrNone(
+      `SELECT id FROM runs WHERE user_id = $1 AND status IN ('in_progress', 'overdue')`, [userId]
     );
-    await Promise.all(inserts);
+    if (active) return res.status(409).json({ error: 'You already have a run in progress', runId: active.id });
 
-    // Step 3: Fetch watcher phone numbers 
-    const watchers = await db.any(`
-      SELECT u.first_name, u.phone_number
-      FROM users u
-      WHERE u.id IN ($1:csv)
-    `, [watcher_ids]);
+    // Create the run and its watchers together so we never end up with a run missing its watchers.
+    const runId = await db.tx(async t => {
+      const run = await t.one(`
+        INSERT INTO runs (user_id, location, duration_minutes, start_time, end_time)
+        VALUES ($1, $2, $3, NOW(), NOW() + ($3 * INTERVAL '1 minute'))
+        RETURNING id
+      `, [userId, location, minutes]);
 
-    // Step 4: Fetch runner info
-    const runner = await db.one(`SELECT first_name, last_name FROM users WHERE id = $1`, [userId]);
+      await t.batch(watcherIds.map(watcherId =>
+        t.none(`INSERT INTO run_watchers (run_id, watcher_id) VALUES ($1, $2)`, [run.id, watcherId])
+      ));
+      return run.id;
+    });
 
-    // Step 5: Send SMS (via email) to each watcher
+    const runner = req.session.user;
+    const watchers = await getRunWatchers(runId);
     for (const watcher of watchers) {
-      //const carrierGateway = getCarrierGateway(watcher.carrier);
-      const carrierGateway = 'txt.att.net'; // All go to AT&T for testing
-      const phoneDigitsOnly = watcher.phone_number.replace(/[^0-9]/g, '');
-      const smsAddress = `${phoneDigitsOnly}@${carrierGateway}`;
-
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: smsAddress,
-        subject: '', // SMS doesn't need a subject
-        text: ` ${runner.first_name} ${runner.last_name} just started a run at ${location}, and should be gone for around ${duration_minutes} minutes!`
-      };
-
-      await transporter.sendMail(mailOptions);
-      console.log(`📤 Sent SMS to ${watcher.first_name} (${smsAddress})`);
+      await sendSms(
+        watcher.phone_number,
+        `${runner.first_name} ${runner.last_name} just started a run at ${location} and should be back in about ` +
+        `${minutes} minutes. Follow along: ${trackingLink(runId)}`
+      );
     }
 
     res.status(201).json({ message: 'Run started and watchers notified!', runId });
   } catch (err) {
     console.error('❌ Error starting run:', err);
     res.status(500).json({ error: 'Something went wrong when starting the run' });
+  }
+});
+
+// The runner's current run, so the Start Run page can resume after a refresh.
+app.get('/api/runs/active', async (req, res) => {
+  const userId = req.session.user?.id;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const run = await db.oneOrNone(`
+      SELECT id, location, duration_minutes, start_time, end_time, status
+      FROM runs
+      WHERE user_id = $1 AND status IN ('in_progress', 'overdue')
+      ORDER BY start_time DESC
+      LIMIT 1
+    `, [userId]);
+    res.json({ run });
+  } catch (err) {
+    console.error('❌ Error loading active run:', err);
+    res.status(500).json({ error: 'Failed to load active run' });
+  }
+});
+
+// Live location ping from the runner's browser.
+app.post('/api/runs/:id/location', async (req, res) => {
+  const userId = req.session.user?.id;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const lat = Number(req.body.lat);
+  const lng = Number(req.body.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    return res.status(400).json({ error: 'Invalid coordinates' });
+  }
+
+  try {
+    const result = await db.result(`
+      UPDATE runs
+      SET last_lat = $3, last_lng = $4, last_location_at = NOW()
+      WHERE id = $1 AND user_id = $2 AND status IN ('in_progress', 'overdue')
+    `, [req.params.id, userId, lat, lng]);
+
+    if (result.rowCount === 0) return res.status(404).json({ error: 'No active run found' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('❌ Error saving location:', err);
+    res.status(500).json({ error: 'Failed to save location' });
+  }
+});
+
+// "I'm OK" check-in: extends the run and cancels any pending alert.
+app.post('/api/runs/:id/checkin', async (req, res) => {
+  const userId = req.session.user?.id;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const extraMinutes = Number(req.body.extra_minutes || 10);
+  if (!Number.isInteger(extraMinutes) || extraMinutes < 1 || extraMinutes > 60) {
+    return res.status(400).json({ error: 'extra_minutes must be between 1 and 60' });
+  }
+
+  try {
+    const run = await db.oneOrNone(`
+      UPDATE runs r
+      SET end_time = NOW() + ($3 * INTERVAL '1 minute'),
+          status = 'in_progress',
+          checkin_sent_at = NULL,
+          overdue_alert_sent_at = NULL
+      FROM runs old
+      WHERE r.id = old.id AND r.id = $1 AND r.user_id = $2 AND r.status IN ('in_progress', 'overdue')
+      RETURNING r.end_time, old.status AS previous_status
+    `, [req.params.id, userId, extraMinutes]);
+
+    if (!run) return res.status(404).json({ error: 'No active run found' });
+
+    // If watchers were already alerted, let them know the runner is OK.
+    if (run.previous_status === 'overdue') {
+      const watchers = await getRunWatchers(req.params.id);
+      for (const watcher of watchers) {
+        await sendSms(watcher.phone_number, `✅ ${req.session.user.first_name} checked in and is OK.`);
+      }
+    }
+
+    res.json({ end_time: run.end_time });
+  } catch (err) {
+    console.error('❌ Error checking in:', err);
+    res.status(500).json({ error: 'Failed to check in' });
+  }
+});
+
+// Live status for the runner and their watchers.
+app.get('/api/runs/:id/track', async (req, res) => {
+  const userId = req.session.user?.id;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const run = await db.oneOrNone(`
+      SELECT r.id, r.user_id, r.location, r.start_time, r.end_time, r.finished_at, r.status,
+             r.last_lat, r.last_lng, r.last_location_at, u.first_name, u.last_name
+      FROM runs r
+      JOIN users u ON u.id = r.user_id
+      WHERE r.id = $1
+        AND (r.user_id = $2 OR EXISTS (
+          SELECT 1 FROM run_watchers rw WHERE rw.run_id = r.id AND rw.watcher_id = $2
+        ))
+    `, [req.params.id, userId]);
+
+    if (!run) return res.status(404).json({ error: 'Run not found' });
+    res.json({
+      ...run,
+      map_link: run.last_lat != null ? mapLink(run.last_lat, run.last_lng) : null,
+    });
+  } catch (err) {
+    console.error('❌ Error loading run status:', err);
+    res.status(500).json({ error: 'Failed to load run' });
   }
 });
 
@@ -684,12 +746,13 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Handle form submission with file
+// Finish a run: save the recap post, close out the run, and tell that run's watchers.
 app.post('/api/runs/finish', upload.single('photo'), async (req, res) => {
   const userId = req.session.user?.id;
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
   const {
+    run_id,
     location,
     duration_seconds,
     miles,
@@ -700,40 +763,31 @@ app.post('/api/runs/finish', upload.single('photo'), async (req, res) => {
   const visibility = action === 'post' ? 'public' : 'private';
   const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
   const pace = miles && duration_seconds ? duration_seconds / miles : null;
+
   try {
-    await db.none(
-      `INSERT INTO posts (user_id, content, image, miles, duration_seconds, location, visibility, pace_seconds_per_mile)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [userId, description, imagePath, miles, duration_seconds, location, visibility, pace]
-    );
+    const runId = await db.tx(async t => {
+      await t.none(
+        `INSERT INTO posts (user_id, content, image, miles, duration_seconds, location, visibility, pace_seconds_per_mile)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [userId, description, imagePath, miles || null, duration_seconds, location, visibility, pace]
+      );
 
-    // Fetch watchers' phone numbers and carriers for the most recent run
-    const watchers = await db.any(`
-      SELECT u.first_name, u.phone_number
-      FROM run_watchers rw
-      JOIN runs r ON rw.run_id = r.id
-      JOIN users u ON rw.watcher_id = u.id
-      WHERE r.user_id = $1
-      ORDER BY r.start_time DESC LIMIT 1
-    `, [userId]);
+      const run = await t.oneOrNone(`
+        UPDATE runs
+        SET status = 'completed', finished_at = NOW()
+        WHERE id = $1 AND user_id = $2 AND status IN ('in_progress', 'overdue')
+        RETURNING id
+      `, [run_id, userId]);
+      return run?.id;
+    });
 
-    // Send SMS via email for each watcher
-    for (const watcher of watchers) {
-      //const carrierGateway = getCarrierGateway(watcher.carrier);
-      const carrierGateway = 'txt.att.net'; // All go to AT&T for testing
-      const phoneDigitsOnly = watcher.phone_number.replace(/[^0-9]/g, '');
-      const smsAddress = `${phoneDigitsOnly}@${carrierGateway}`;
-
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: smsAddress,
-        subject: '', // Empty subject for SMS
-        text: `${req.session.user.first_name} just safely finished their run at ${location}!`
-      };
-
-      await transporter.sendMail(mailOptions);
-      console.log(`📤 Sent finish SMS to ${watcher.first_name}`);
+    if (runId) {
+      const watchers = await getRunWatchers(runId);
+      for (const watcher of watchers) {
+        await sendSms(watcher.phone_number, `✅ ${req.session.user.first_name} just safely finished their run at ${location}!`);
+      }
     }
+
     res.status(201).json({ message: '✅ Run recap saved successfully!' });
   } catch (err) {
     console.error('❌ Error saving run recap:', err);
