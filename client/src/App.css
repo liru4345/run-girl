@@ -625,7 +625,7 @@
 }
 .rh-engage-btn:hover { background: #f6f6fa; color: var(--rh-ink); }
 .rh-engage-btn.active { color: var(--rh-ink); }
-.rh-engage-btn.liked { color: #f0436b; }
+.rh-engage-btn.liked, .rh-engage-btn.liked:hover { color: #f0436b; }
 .rh-engage-btn.liked svg { animation: rh-pop 0.25s ease; }
 @keyframes rh-pop {
   0% { transform: scale(1); }

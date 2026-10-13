@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { FaEnvelope, FaLock } from "react-icons/fa";
 import AuthLayout from "../components/authLayout";
 
@@ -11,6 +11,10 @@ const Login = () => {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Only follow in-app paths, never another site.
+  const next = searchParams.get("next");
+  const destination = next && next.startsWith("/") && !next.startsWith("//") ? next : "/feed";
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -33,7 +37,7 @@ const Login = () => {
       const data = await res.json();
 
       if (res.ok) {
-        navigate("/feed");
+        navigate(destination);
       } else {
         setError(data.error === "Invalid credentials" ? "That email and password don't match." : data.error || "Login failed");
       }

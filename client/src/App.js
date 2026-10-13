@@ -1,6 +1,6 @@
 import React from "react";
 import 'animate.css';
-import { Routes, Route } from "react-router-dom"; // ❌ Remove Router from here
+import { Routes, Route } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
 import Header from "./components/header";
 import Footer from "./components/footer";
@@ -19,14 +19,11 @@ import TrackRun from "./pages/trackRun";
 import PostView from "./pages/postView";
 import WatchingBanner from "./components/watchingBanner";
 import NotificationToaster from "./components/notificationToaster";
-
-
+import RequireAuth from "./components/requireAuth";
 
 import "./App.css";
 
 function App() {
-  console.log("🔹 App.js is rendering!"); // Debugging
-
   return (
     <>
       <Header />
@@ -38,17 +35,19 @@ function App() {
           <Route path="/about" element={<About />} />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/profile/:id" element={<Profile />} /> {/* Add this */}
-          <Route path="/friends" element={<Friends />} />
-          <Route path="/notifications" element={<Notifications />} />
-          <Route path="/start-run" element={<StartRun/>} />
-          <Route path="/posts" element={<UserPosts/>} />
-          <Route path="/posts/:id" element={<UserPosts/>} />
-          <Route path="/feed" element={<Feed/>} />
-          <Route path="/calender" element={<Calender/>} />
-          <Route path="/post/:id" element={<PostView/>} />
-          <Route path="/track/:id" element={<TrackRun/>} />
+          <Route element={<RequireAuth />}>
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/profile/:id" element={<Profile />} />
+            <Route path="/friends" element={<Friends />} />
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/start-run" element={<StartRun />} />
+            <Route path="/posts" element={<UserPosts />} />
+            <Route path="/posts/:id" element={<UserPosts />} />
+            <Route path="/feed" element={<Feed />} />
+            <Route path="/calender" element={<Calender />} />
+            <Route path="/post/:id" element={<PostView />} />
+            <Route path="/track/:id" element={<TrackRun />} />
+          </Route>
         </Routes>
       </div>
       <Footer />
