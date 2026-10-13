@@ -217,15 +217,20 @@ app.get('/api/friends/search', async (req, res) => {
     return res.status(401).send({ error: 'Unauthorized' });
   }
 
-  const searchTerm = req.query.query;
+  const searchTerm = (req.query.query || '').trim();
   const currentUserId = req.session.user.id;
 
   try {
+    // Phone numbers are searchable (to find someone you know) but never returned:
+    // only a runner's watchers can see their number.
     const users = await db.any(`
-      SELECT id, first_name, last_name, phone_number
+      SELECT id, first_name, last_name, profile_picture, bio
       FROM users
-      WHERE (first_name ILIKE $1 OR last_name ILIKE $1 OR phone_number ILIKE $1)
+      WHERE (first_name ILIKE $1 OR last_name ILIKE $1
+             OR (first_name || ' ' || last_name) ILIKE $1 OR phone_number ILIKE $1)
       AND id != $2
+      ORDER BY first_name, last_name
+      LIMIT 25
     `, [`%${searchTerm}%`, currentUserId]);
 
     const friendStatuses = await db.any(`
@@ -242,7 +247,10 @@ app.get('/api/friends/search', async (req, res) => {
     const results = users.map(user => ({
       id: user.id,
       name: `${user.first_name} ${user.last_name}`,
-      phone: user.phone_number,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      profile_picture: user.profile_picture,
+      bio: user.bio,
       status: statusMap[user.id] || 'none'
     }));
 
@@ -430,7 +438,11 @@ app.get('/api/notifications', async (req, res) => {
   try {
     // Everything except follow requests, newest first (includes run alerts).
     const general = await db.any(
-      `SELECT * FROM notifications WHERE receiver_id = $1 AND type <> 'follow_request' ORDER BY created_at DESC`,
+      `SELECT n.*, (r.status IN ('in_progress', 'overdue')) AS run_active
+       FROM notifications n
+       LEFT JOIN runs r ON r.id = n.run_id
+       WHERE n.receiver_id = $1 AND n.type <> 'follow_request'
+       ORDER BY n.created_at DESC`,
       [userId]
     );
     const requests = await db.any(

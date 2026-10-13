@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Avatar from "./avatar";
+import RunHerBadge from "./runHerBadge";
 import { checkInRun } from "../runActions";
 
 // Live alerts: checks for new notifications every few seconds and shows them as pop-ups
@@ -58,7 +59,7 @@ const NotificationToaster = () => {
     const title = n.type === "run_alert" ? "⚠️ RunHer alert" : "RunHer";
     const systemNotification = new Notification(title, {
       body: n.sender_username === "RunHer" ? n.message : `${n.sender_username} ${n.message}`,
-      icon: n.profile_icon || "/img/runHerLogo.png",
+      icon: n.profile_icon || "/img/runHerLogo2.png",
       tag: `runher-${n.id}`,
     });
     systemNotification.onclick = () => {
@@ -161,7 +162,7 @@ const NotificationToaster = () => {
                     className="me-3"
                   />
                 ) : (
-                  <img src="/img/runHerLogo.png" alt="RunHer" width={40} height={40} className="me-3" style={{ objectFit: "contain" }} />
+                  <span className="me-3"><RunHerBadge size={40} /></span>
                 )}
                 <div className="flex-grow-1">
                   {urgent && <div className="text-danger fw-semibold small mb-1">⚠️ Safety alert</div>}

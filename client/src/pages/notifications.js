@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { FaCheck, FaTimes, FaBell, FaUserFriends } from 'react-icons/fa';
 import Avatar from '../components/avatar';
+import RunHerBadge from '../components/runHerBadge';
+import { timeAgo } from '../components/postCard';
 import { UNREAD_EVENT } from '../components/notificationToaster';
 import { checkInRun } from '../runActions';
 
 const Notifications = () => {
-  const [general, setGeneral] = useState([]);
+  const [general, setGeneral] = useState(null); // null while loading
   const [requests, setRequests] = useState([]);
   const [activeTab, setActiveTab] = useState('all');
   const [checkInResults, setCheckInResults] = useState({}); // notification id -> result message
@@ -25,7 +28,8 @@ const Notifications = () => {
       .then((data) => {
         setGeneral(data.general || []);
         setRequests(data.requests || []);
-      });
+      })
+      .catch(() => setGeneral([]));
 
     // Opening this page counts as reading everything.
     fetch('/api/notifications/read-all', { method: 'POST', credentials: 'include' })
@@ -35,21 +39,14 @@ const Notifications = () => {
 
   const handleFollowAction = async (senderId, action) => {
     try {
-      const res = await fetch(`/api/follow-request/${action}/${senderId}`, {
-        method: 'POST'
-      });
-  
-      const text = await res.text(); // <-- helpful for debugging
-  
-      if (!res.ok) {
-        console.error(`❌ Failed ${action}:`, text);
-        alert(`Action failed: ${text}`);
-      } else {
+      const res = await fetch(`/api/follow-request/${action}/${senderId}`, { method: 'POST' });
+      if (res.ok) {
         setRequests((prev) => prev.filter((r) => r.sender_id !== senderId));
+      } else {
+        console.error(`❌ Failed ${action}:`, await res.text());
       }
     } catch (err) {
       console.error(`❌ Error during ${action}:`, err);
-      alert('Something went wrong.');
     }
   };
 
@@ -62,123 +59,142 @@ const Notifications = () => {
     }
   };
 
+  const splitName = (name = '') => name.split(' ');
+
   return (
-    <div className="container py-3 mt-5">
-      <h3 className="mb-4">Notifications</h3>
+    <div className="rh-page mt-4 mb-5" style={{ maxWidth: 640 }}>
+      <div className="mb-3">
+        <h2 className="fw-bold mb-1">Notifications</h2>
+        <div className="rh-subtle">Run updates, safety alerts, and follow requests</div>
+      </div>
 
-      {/* Tabs */}
-      <ul className="nav nav-tabs mb-3">
-        <li className="nav-item">
-          <button className={`nav-link ${activeTab === 'all' ? 'active' : ''}`} onClick={() => setActiveTab('all')}>
-            All
-          </button>
-        </li>
-        <li className="nav-item">
-          <button className={`nav-link ${activeTab === 'requests' ? 'active' : ''}`} onClick={() => setActiveTab('requests')}>
-            Requests
-          </button>
-        </li>
-      </ul>
+      <div className="d-flex gap-2 mb-3">
+        <button className={`rh-chip ${activeTab === 'all' ? 'active' : ''}`} onClick={() => setActiveTab('all')}>
+          All
+        </button>
+        <button className={`rh-chip ${activeTab === 'requests' ? 'active' : ''}`} onClick={() => setActiveTab('requests')}>
+          Follow requests
+          {requests.length > 0 && (
+            <span className="badge rounded-pill ms-2" style={{ background: activeTab === 'requests' ? '#fff' : 'var(--rh-pink)', color: activeTab === 'requests' ? 'var(--rh-pink)' : '#fff' }}>
+              {requests.length}
+            </span>
+          )}
+        </button>
+      </div>
 
-      {/* All Notifications */}
       {activeTab === 'all' && (
-        <div>
-          {general.length === 0 && <p className="text-muted">No notifications yet.</p>}
-          {general.map((notif) => {
+        <div className="rh-card p-2">
+          {general === null && <p className="rh-subtle text-center my-4">Loading…</p>}
+
+          {general?.length === 0 && (
+            <div className="text-center py-5">
+              <FaBell style={{ fontSize: '1.8rem', color: 'var(--rh-pink)' }} />
+              <div className="fw-semibold mt-2">You're all caught up</div>
+              <div className="rh-subtle">Run updates from friends will show up here.</div>
+            </div>
+          )}
+
+          {general?.map((notif, i) => {
             const fromRunHer = notif.sender_username === 'RunHer';
             const urgent = notif.type === 'run_alert';
-            const [firstName = '', lastName = ''] = (notif.sender_username || '').split(' ');
+            const [firstName, lastName] = splitName(notif.sender_username);
             return (
               <div
                 key={notif.id}
-                className={`card notification-card mb-2 p-3 position-relative ${urgent ? 'border-danger' : ''} ${notif.is_read ? '' : 'bg-light'}`}
+                className="rh-notif d-flex align-items-start gap-3 p-3 position-relative"
+                style={{
+                  borderTop: i > 0 ? '1px solid var(--rh-line)' : undefined,
+                  borderLeft: urgent ? '4px solid #f0436b' : '4px solid transparent',
+                  background: notif.is_read ? undefined : 'var(--rh-pink-soft)',
+                  borderRadius: 12,
+                }}
               >
-                <div className="d-flex align-items-start">
-                  {fromRunHer ? (
-                    <img src="/img/runHerLogo.png" alt="RunHer" width={40} height={40} className="me-3" style={{ objectFit: 'contain' }} />
-                  ) : (
-                    <Avatar src={notif.profile_icon} firstName={firstName} lastName={lastName} size={40} className="me-3" />
-                  )}
-                  <div className="flex-grow-1 text-start">
-                    {urgent && <span className="text-danger fw-semibold">⚠️ </span>}
+                {fromRunHer ? (
+                  <RunHerBadge size={44} />
+                ) : (
+                  <Avatar src={notif.profile_icon} firstName={firstName} lastName={lastName} size={44} />
+                )}
+
+                <div className="flex-grow-1 pe-4">
+                  {urgent && <div className="text-danger fw-semibold small mb-1">⚠️ Safety alert</div>}
+                  <div>
                     {!fromRunHer && <strong>{notif.sender_username} </strong>}
                     {notif.message}
-                    <br />
-                    <small className="text-muted">{new Date(notif.created_at).toLocaleString()}</small>
-                    {notif.run_id && fromRunHer && (
-                      <div className="mt-2">
-                        {checkInResults[notif.id] ? (
-                          <small>{checkInResults[notif.id]}</small>
-                        ) : (
-                          <button className="btn btn-sm btn-warning" onClick={() => handleCheckIn(notif)}>
-                            I'm OK, add 10 minutes
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    {notif.run_id && !fromRunHer && (
-                      <div>
-                        <Link
-                          to={`/track/${notif.run_id}`}
-                          className={`btn btn-sm mt-2 ${urgent ? 'btn-outline-danger' : 'btn-outline-primary'}`}
-                        >
-                          View run
-                        </Link>
-                      </div>
-                    )}
                   </div>
+                  <div className="rh-subtle small mt-1">{timeAgo(notif.created_at)}</div>
+
+                  {notif.run_id && fromRunHer && notif.run_active && (
+                    <div className="mt-2">
+                      {checkInResults[notif.id] ? (
+                        <span className="rh-subtle small">{checkInResults[notif.id]}</span>
+                      ) : (
+                        <button className="rh-btn rh-btn-warning" style={{ padding: '6px 14px' }} onClick={() => handleCheckIn(notif)}>
+                          <FaCheck /> I'm OK, add 10 minutes
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {notif.run_id && !fromRunHer && (
+                    <Link
+                      to={`/track/${notif.run_id}`}
+                      className={`rh-btn ${urgent ? 'rh-btn-primary' : 'rh-btn-secondary'} mt-2`}
+                      style={{ padding: '6px 14px' }}
+                    >
+                      {urgent ? 'See where they are' : 'View run'}
+                    </Link>
+                  )}
                 </div>
+
                 <button
-                  className="btn-close position-absolute top-0 end-0 m-2"
+                  className="btn-close position-absolute"
+                  style={{ top: 16, right: 16, fontSize: '0.7rem' }}
+                  aria-label="Dismiss notification"
                   onClick={() => dismissNotification(notif.id)}
-                ></button>
+                />
               </div>
             );
           })}
-
         </div>
       )}
 
-      {/* Follow Requests */}
       {activeTab === 'requests' && (
-        <div>
-          {requests.map((req) => (
-            <div key={req.request_id} className="card notification-card mb-2 p-3">
-              <div className="d-flex justify-content-between align-items-center">
-                {/* Left side: profile and text */}
-                <div className="d-flex align-items-center">
-                  <Avatar
-                    src={req.profile_icon}
-                    firstName={(req.sender_username || '').split(' ')[0]}
-                    lastName={(req.sender_username || '').split(' ')[1]}
-                    size={40}
-                    className="me-3"
-                  />
-                  <div>
-                    <strong>{req.sender_username}</strong> requested to follow you.
-                    <br />
-                    <small className="text-muted">{req.requested_at}</small>
-                  </div>
-                </div>
+        <div className="rh-card p-2">
+          {requests.length === 0 && (
+            <div className="text-center py-5">
+              <FaUserFriends style={{ fontSize: '1.8rem', color: 'var(--rh-pink)' }} />
+              <div className="fw-semibold mt-2">No follow requests</div>
+              <div className="rh-subtle">When someone asks to follow you, you'll see it here.</div>
+            </div>
+          )}
 
-                {/* Right side: action buttons */}
-                <div className="d-flex gap-2 ms-3">
-                  <button
-                    className="btn btn-sm btn-primary"
-                    onClick={() => handleFollowAction(req.sender_id, 'approve')}
-                  >
-                    Approve
+          {requests.map((req, i) => {
+            const [firstName, lastName] = splitName(req.sender_username);
+            return (
+              <div
+                key={req.request_id || req.id}
+                className="d-flex align-items-center gap-3 p-3 flex-wrap"
+                style={i > 0 ? { borderTop: '1px solid var(--rh-line)' } : undefined}
+              >
+                <Link to={`/profile/${req.sender_id}`}>
+                  <Avatar src={req.profile_icon} firstName={firstName} lastName={lastName} size={44} />
+                </Link>
+                <div className="flex-grow-1">
+                  <Link to={`/profile/${req.sender_id}`} className="rh-person-name text-decoration-none">
+                    {req.sender_username}
+                  </Link>
+                  <div className="rh-subtle small">wants to follow you</div>
+                </div>
+                <div className="d-flex gap-2">
+                  <button className="rh-btn rh-btn-primary" style={{ padding: '6px 16px' }} onClick={() => handleFollowAction(req.sender_id, 'approve')}>
+                    <FaCheck /> Accept
                   </button>
-                  <button
-                    className="btn btn-sm btn-outline-danger"
-                    onClick={() => handleFollowAction(req.sender_id, 'decline')}
-                  >
-                    Decline
+                  <button className="rh-btn rh-btn-secondary" style={{ padding: '6px 16px' }} onClick={() => handleFollowAction(req.sender_id, 'decline')}>
+                    <FaTimes /> Decline
                   </button>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
