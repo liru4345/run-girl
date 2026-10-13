@@ -288,7 +288,7 @@ app.post('/api/friends/request', async (req, res) => {
       userId,
       senderName,
       profilePic,
-      `${senderName} requested to follow you.`
+      'requested to follow you.'
     ]);
 
     res.sendStatus(200);
@@ -383,17 +383,13 @@ app.post('/api/follow-request/approve/:id', async (req, res) => {
       WHERE sender_id = $1 AND receiver_id = $2 AND type = 'follow_request'
     `, [requesterId, receiverId]);
 
-    // Step 3: Send a notification to the requester (who sent the follow request)
+    // Step 3: Let the requester know they can now see this user's runs
+    const approver = req.session.user;
     await db.none(`
-      INSERT INTO notifications (sender_id, receiver_id, message, type)
-      VALUES ($1, $2, $3, 'general')
-    `, [receiverId, requesterId, 'accepted your follow request']);
-
-    // Step 4: Create a general notification for the approver
-    await db.none(`
-      INSERT INTO notifications (sender_id, receiver_id, message, type)
-      VALUES ($1, $2, $3, 'general')
-    `, [requesterId, receiverId, 'You are now following this user']);
+      INSERT INTO notifications (sender_id, receiver_id, sender_username, profile_icon, message, type)
+      VALUES ($1, $2, $3, $4, $5, 'general')
+    `, [receiverId, requesterId, `${approver.first_name} ${approver.last_name}`, approver.profile_picture,
+        'accepted your follow request. You can now see their runs and pick them as a watcher.']);
 
     res.sendStatus(200);
   } catch (err) {
@@ -438,8 +434,12 @@ app.get('/api/notifications', async (req, res) => {
   try {
     // Everything except follow requests, newest first (includes run alerts).
     const general = await db.any(
-      `SELECT n.*, (r.status IN ('in_progress', 'overdue')) AS run_active
+      `SELECT n.*,
+              COALESCE(n.sender_username, u.first_name || ' ' || u.last_name) AS sender_username,
+              COALESCE(n.profile_icon, u.profile_picture) AS profile_icon,
+              (r.status IN ('in_progress', 'overdue')) AS run_active
        FROM notifications n
+       LEFT JOIN users u ON u.id = n.sender_id
        LEFT JOIN runs r ON r.id = n.run_id
        WHERE n.receiver_id = $1 AND n.type <> 'follow_request'
        ORDER BY n.created_at DESC`,
@@ -492,10 +492,13 @@ app.get('/api/notifications/live', async (req, res) => {
     const [notifications, summary] = await Promise.all([
       Number.isInteger(after)
         ? db.any(`
-            SELECT id, sender_username, profile_icon, message, type, run_id, created_at
-            FROM notifications
-            WHERE receiver_id = $1 AND id > $2
-            ORDER BY id
+            SELECT n.id, n.message, n.type, n.run_id, n.created_at,
+                   COALESCE(n.sender_username, u.first_name || ' ' || u.last_name) AS sender_username,
+                   COALESCE(n.profile_icon, u.profile_picture) AS profile_icon
+            FROM notifications n
+            LEFT JOIN users u ON u.id = n.sender_id
+            WHERE n.receiver_id = $1 AND n.id > $2
+            ORDER BY n.id
           `, [userId, after])
         : [],
       db.one(`

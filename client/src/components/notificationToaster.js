@@ -153,7 +153,7 @@ const NotificationToaster = () => {
               role="alert"
             >
               <div className="card-body d-flex align-items-start p-3">
-                {n.profile_icon || n.sender_username !== "RunHer" ? (
+                {n.sender_username && n.sender_username !== "RunHer" ? (
                   <Avatar
                     src={n.profile_icon}
                     firstName={(n.sender_username || "").split(" ")[0]}
@@ -178,6 +178,11 @@ const NotificationToaster = () => {
                     >
                       {n.checkingIn ? "Checking in..." : "I'm OK, add 10 minutes"}
                     </button>
+                  )}
+                  {n.type === "follow_request" && (
+                    <Link to="/notifications" className="btn btn-sm btn-outline-primary mt-2" onClick={() => dismissToast(n.id)}>
+                      Review request
+                    </Link>
                   )}
                   {n.run_id && n.sender_username !== "RunHer" && (
                     <Link
