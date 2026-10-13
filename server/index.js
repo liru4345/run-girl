@@ -633,6 +633,16 @@ app.get('/api/runs/active', async (req, res) => {
       ORDER BY start_time DESC
       LIMIT 1
     `, [userId]);
+
+    if (run) {
+      run.watchers = await db.any(`
+        SELECT u.id, u.first_name, u.last_name, u.profile_picture
+        FROM run_watchers rw
+        JOIN users u ON u.id = rw.watcher_id
+        WHERE rw.run_id = $1
+        ORDER BY u.first_name
+      `, [run.id]);
+    }
     res.json({ run });
   } catch (err) {
     console.error('❌ Error loading active run:', err);
