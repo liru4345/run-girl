@@ -17,8 +17,8 @@ services:
     env_file: ./server/.env
     environment:
       - NODE_ENV=development
-      # Log texts instead of sending them. Run `SMS_DRY_RUN=false docker compose up -d` to send real texts.
-      - SMS_DRY_RUN=${SMS_DRY_RUN:-true}
+      # Alerts are always sent in-app. Run `SMS_ENABLED=true docker compose up -d` to also send texts.
+      - SMS_ENABLED=${SMS_ENABLED:-false}
       # Minutes after the planned end time before watchers are alerted.
       - OVERDUE_GRACE_MINUTES=${OVERDUE_GRACE_MINUTES:-10}
     depends_on:

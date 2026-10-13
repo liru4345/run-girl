@@ -1,4 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import Avatar from '../components/avatar';
+import { UNREAD_EVENT } from '../components/notificationToaster';
 
 const Notifications = () => {
   const [general, setGeneral] = useState([]);
@@ -12,6 +15,11 @@ const Notifications = () => {
         setGeneral(data.general || []);
         setRequests(data.requests || []);
       });
+
+    // Opening this page counts as reading everything.
+    fetch('/api/notifications/read-all', { method: 'POST', credentials: 'include' })
+      .then(() => window.dispatchEvent(new CustomEvent(UNREAD_EVENT, { detail: 0 })))
+      .catch(() => {});
   }, []);
 
   const handleFollowAction = async (senderId, action) => {
@@ -64,31 +72,47 @@ const Notifications = () => {
       {/* All Notifications */}
       {activeTab === 'all' && (
         <div>
-          {general.map((notif) => (
-            <div
-            key={notif.id}
-            className="card notification-card mb-2 p-3 position-relative"
-          >
-            <div className="d-flex">
-              <img
-                src={notif.profile_icon || 'https://via.placeholder.com/40'}
-                alt="profile"
-                className="me-3 rounded-circle"
-                width={40}
-                height={40}
-              />
-              <div className="flex-grow-1 text-start">
-                <strong>{notif.sender_username}</strong> {notif.message}
-                <br />
-                <small className="text-muted">{notif.created_at}</small>
+          {general.length === 0 && <p className="text-muted">No notifications yet.</p>}
+          {general.map((notif) => {
+            const fromRunHer = notif.sender_username === 'RunHer';
+            const urgent = notif.type === 'run_alert';
+            const [firstName = '', lastName = ''] = (notif.sender_username || '').split(' ');
+            return (
+              <div
+                key={notif.id}
+                className={`card notification-card mb-2 p-3 position-relative ${urgent ? 'border-danger' : ''} ${notif.is_read ? '' : 'bg-light'}`}
+              >
+                <div className="d-flex align-items-start">
+                  {fromRunHer ? (
+                    <img src="/img/runHerLogo.png" alt="RunHer" width={40} height={40} className="me-3" style={{ objectFit: 'contain' }} />
+                  ) : (
+                    <Avatar src={notif.profile_icon} firstName={firstName} lastName={lastName} size={40} className="me-3" />
+                  )}
+                  <div className="flex-grow-1 text-start">
+                    {urgent && <span className="text-danger fw-semibold">⚠️ </span>}
+                    {!fromRunHer && <strong>{notif.sender_username} </strong>}
+                    {notif.message}
+                    <br />
+                    <small className="text-muted">{new Date(notif.created_at).toLocaleString()}</small>
+                    {notif.run_id && (
+                      <div>
+                        <Link
+                          to={fromRunHer ? '/start-run' : `/track/${notif.run_id}`}
+                          className={`btn btn-sm mt-2 ${urgent ? 'btn-outline-danger' : 'btn-outline-primary'}`}
+                        >
+                          {fromRunHer ? 'Check in' : 'View run'}
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <button
+                  className="btn-close position-absolute top-0 end-0 m-2"
+                  onClick={() => dismissNotification(notif.id)}
+                ></button>
               </div>
-            </div>
-            <button
-              className="btn-close position-absolute top-0 end-0 m-2"
-              onClick={() => dismissNotification(notif.id)}
-            ></button>
-          </div>
-          ))}
+            );
+          })}
 
         </div>
       )}
@@ -101,12 +125,12 @@ const Notifications = () => {
               <div className="d-flex justify-content-between align-items-center">
                 {/* Left side: profile and text */}
                 <div className="d-flex align-items-center">
-                  <img
-                    src={req.profile_icon || 'https://via.placeholder.com/40'}
-                    alt="profile"
-                    className="me-3 rounded-circle"
-                    width={40}
-                    height={40}
+                  <Avatar
+                    src={req.profile_icon}
+                    firstName={(req.sender_username || '').split(' ')[0]}
+                    lastName={(req.sender_username || '').split(' ')[1]}
+                    size={40}
+                    className="me-3"
                   />
                   <div>
                     <strong>{req.sender_username}</strong> requested to follow you.

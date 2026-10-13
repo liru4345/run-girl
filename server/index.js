@@ -27,15 +27,16 @@ const dbConfig = {
 };
 const db = pgp(dbConfig);
 
-const { sendSms } = require('./sms');
+const { createNotifier } = require('./notify');
 const { startSafetyMonitor, mapLink, trackingLink } = require('./safety');
+const notify = createNotifier(db);
 
 const connectToDatabase = async (retries = 5) => {
   while (retries) {
     try {
       await db.connect();
       console.log("✅ Database connection successful");
-      startSafetyMonitor(db, sendSms);
+      startSafetyMonitor(db, notify);
       break;
     } catch (err) {
       console.error("❌ Database connection failed. Retrying...", err.message);
@@ -427,9 +428,10 @@ app.get('/api/notifications', async (req, res) => {
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
+    // Everything except follow requests, newest first (includes run alerts).
     const general = await db.any(
-      'SELECT * FROM notifications WHERE receiver_id = $1 AND type = $2',
-      [userId, 'general']
+      `SELECT * FROM notifications WHERE receiver_id = $1 AND type <> 'follow_request' ORDER BY created_at DESC`,
+      [userId]
     );
     const requests = await db.any(
       'SELECT * FROM notifications WHERE receiver_id = $1 AND type = $2',
@@ -464,6 +466,54 @@ app.post('/api/notifications/dismiss/:id', async (req, res) => {
   } catch (err) {
     console.error('❌ Error dismissing notification:', err);
     res.status(500).send({ error: 'Failed to dismiss notification' });
+  }
+});
+
+// New notifications since the last one the client has seen, for live pop-ups.
+// Without ?after it only returns the latest id, so old notifications don't pop up on page load.
+app.get('/api/notifications/live', async (req, res) => {
+  const userId = req.session.user?.id;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const after = Number(req.query.after);
+    const [notifications, summary] = await Promise.all([
+      Number.isInteger(after)
+        ? db.any(`
+            SELECT id, sender_username, profile_icon, message, type, run_id, created_at
+            FROM notifications
+            WHERE receiver_id = $1 AND id > $2
+            ORDER BY id
+          `, [userId, after])
+        : [],
+      db.one(`
+        SELECT COALESCE(MAX(id), 0) AS latest_id, COUNT(*) FILTER (WHERE NOT is_read) AS unread
+        FROM notifications
+        WHERE receiver_id = $1
+      `, [userId]),
+    ]);
+
+    res.json({
+      notifications,
+      latest_id: summary.latest_id,
+      unread_count: parseInt(summary.unread),
+    });
+  } catch (err) {
+    console.error('❌ Error loading live notifications:', err);
+    res.status(500).json({ error: 'Failed to load notifications' });
+  }
+});
+
+app.post('/api/notifications/read-all', async (req, res) => {
+  const userId = req.session.user?.id;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    await db.none(`UPDATE notifications SET is_read = TRUE WHERE receiver_id = $1 AND NOT is_read`, [userId]);
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('❌ Error marking notifications read:', err);
+    res.status(500).json({ error: 'Failed to mark notifications read' });
   }
 });
 
@@ -553,11 +603,14 @@ app.post('/api/start-run', async (req, res) => {
     const runner = req.session.user;
     const watchers = await getRunWatchers(runId);
     for (const watcher of watchers) {
-      await sendSms(
-        watcher.phone_number,
-        `${runner.first_name} ${runner.last_name} just started a run at ${location} and should be back in about ` +
-        `${minutes} minutes. Follow along: ${trackingLink(runId)}`
-      );
+      await notify({
+        to: watcher,
+        from: runner,
+        runId,
+        message: `started a run at ${location} and should be back in about ${minutes} minutes.`,
+        smsText: `${runner.first_name} ${runner.last_name} just started a run at ${location} and should be back in about ` +
+          `${minutes} minutes. Follow along: ${trackingLink(runId)}`,
+      });
     }
 
     res.status(201).json({ message: 'Run started and watchers notified!', runId });
@@ -641,7 +694,13 @@ app.post('/api/runs/:id/checkin', async (req, res) => {
     if (run.previous_status === 'overdue') {
       const watchers = await getRunWatchers(req.params.id);
       for (const watcher of watchers) {
-        await sendSms(watcher.phone_number, `✅ ${req.session.user.first_name} checked in and is OK.`);
+        await notify({
+          to: watcher,
+          from: req.session.user,
+          runId: Number(req.params.id),
+          message: 'checked in and is OK.',
+          smsText: `✅ ${req.session.user.first_name} checked in and is OK.`,
+        });
       }
     }
 
@@ -821,7 +880,13 @@ app.post('/api/runs/finish', upload.single('photo'), async (req, res) => {
     if (runId) {
       const watchers = await getRunWatchers(runId);
       for (const watcher of watchers) {
-        await sendSms(watcher.phone_number, `✅ ${req.session.user.first_name} just safely finished their run at ${location}!`);
+        await notify({
+          to: watcher,
+          from: req.session.user,
+          runId,
+          message: `safely finished their run at ${location}! ✅`,
+          smsText: `✅ ${req.session.user.first_name} just safely finished their run at ${location}!`,
+        });
       }
     }
 

@@ -1,9 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { FaBell } from "react-icons/fa"; // Import bell icon
+import { UNREAD_EVENT } from "./notificationToaster";
 
 const Header = () => {
   const [user, setUser] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // The notification poller broadcasts the unread count; show it on the bell.
+  useEffect(() => {
+    const onUnread = (e) => setUnreadCount(e.detail);
+    window.addEventListener(UNREAD_EVENT, onUnread);
+    return () => window.removeEventListener(UNREAD_EVENT, onUnread);
+  }, []);
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
@@ -70,8 +79,13 @@ const Header = () => {
                 </li>
                 {user && (
               <li className="nav-item">
-                <Link className="nav-link" to="/notifications">
-                  <FaBell /> {/* Bell icon */}
+                <Link className="nav-link position-relative" to="/notifications" aria-label={`Notifications (${unreadCount} unread)`}>
+                  <FaBell />
+                  {unreadCount > 0 && (
+                    <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style={{ fontSize: "0.65rem" }}>
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
                 </Link>
               </li>
             )}

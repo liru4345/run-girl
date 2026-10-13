@@ -1,5 +1,5 @@
 // Sends text messages through a carrier's email-to-SMS gateway (e.g. 5551234567@txt.att.net).
-// Set SMS_DRY_RUN=true to log messages instead of sending them (useful for local demos and testing).
+// Only used when SMS_ENABLED=true (see notify.js).
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
@@ -29,11 +29,6 @@ async function sendSms(phoneNumber, text) {
     return;
   }
   const to = smsAddress(phoneNumber);
-
-  if (process.env.SMS_DRY_RUN === 'true') {
-    console.log(`📵 [dry run] SMS to ${to}: ${text}`);
-    return;
-  }
 
   try {
     await transporter.sendMail({ from: process.env.EMAIL_USER, to, subject: '', text });

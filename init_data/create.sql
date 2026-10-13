@@ -94,6 +94,10 @@ CREATE TABLE IF NOT EXISTS runs (
 -- The safety monitor scans active runs every 15 seconds
 CREATE INDEX IF NOT EXISTS idx_runs_active ON runs (status, end_time);
 
+-- Run alerts link back to the run they're about (added here because runs is created after notifications)
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS run_id INTEGER REFERENCES runs(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_notifications_receiver ON notifications (receiver_id, id);
+
 
 CREATE TABLE IF NOT EXISTS run_watchers (
   id SERIAL PRIMARY KEY,

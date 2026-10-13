@@ -17,6 +17,7 @@ import Feed from "./pages/feed";
 import Calender from "./pages/calender";
 import TrackRun from "./pages/trackRun";
 import WatchingBanner from "./components/watchingBanner";
+import NotificationToaster from "./components/notificationToaster";
 
 
 
@@ -28,6 +29,7 @@ function App() {
   return (
     <>
       <Header />
+      <NotificationToaster />
       <WatchingBanner />
       <div className="container mt-4">
         <Routes>
