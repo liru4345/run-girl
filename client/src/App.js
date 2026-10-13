@@ -16,6 +16,7 @@ import UserPosts from "./pages/userPosts";
 import Feed from "./pages/feed";
 import Calender from "./pages/calender";
 import TrackRun from "./pages/trackRun";
+import PostView from "./pages/postView";
 import WatchingBanner from "./components/watchingBanner";
 import NotificationToaster from "./components/notificationToaster";
 
@@ -46,6 +47,7 @@ function App() {
           <Route path="/posts/:id" element={<UserPosts/>} />
           <Route path="/feed" element={<Feed/>} />
           <Route path="/calender" element={<Calender/>} />
+          <Route path="/post/:id" element={<PostView/>} />
           <Route path="/track/:id" element={<TrackRun/>} />
         </Routes>
       </div>

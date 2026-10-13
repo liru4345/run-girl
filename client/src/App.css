@@ -511,3 +511,98 @@
   object-fit: contain;
   filter: brightness(0) saturate(100%) invert(58%) sepia(64%) saturate(2364%) hue-rotate(296deg) brightness(101%) contrast(101%);
 }
+
+/* Calendar */
+.rh-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+.rh-cal-cell {
+  min-height: 92px;
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  background: #fafafd;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  overflow: hidden;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.rh-cal-cell:hover { border-color: var(--rh-line); background: #fff; }
+.rh-cal-cell.outside { background: transparent; opacity: 0.45; }
+.rh-cal-cell.selected { border-color: var(--rh-pink); background: #fff; box-shadow: 0 4px 14px rgba(255, 105, 180, 0.18); }
+.rh-cal-daynum { font-weight: 700; font-size: 0.85rem; color: var(--rh-ink); }
+.rh-cal-cell.today .rh-cal-daynum {
+  background: var(--rh-pink);
+  color: #fff;
+  border-radius: 999px;
+  min-width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+}
+.rh-cal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.rh-cal-chip.done { background: #e7f8f0; color: #18865a; }
+.rh-cal-chip.planned { background: var(--rh-pink); color: #fff; }
+.rh-cal-chip.friend { background: #fff; color: var(--rh-pink-dark); border: 1.5px dashed var(--rh-pink); }
+.rh-cal-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.rh-cal-dot.done { background: #4cc38a; }
+.rh-cal-dot.planned { background: var(--rh-pink); }
+.rh-cal-dot.friend { border: 1.5px dashed var(--rh-pink); }
+
+.rh-cal-item {
+  border: 1px solid var(--rh-line);
+  border-left-width: 4px;
+  border-radius: 12px;
+  padding: 12px;
+}
+.rh-cal-item.done { border-left-color: #4cc38a; }
+.rh-cal-item.planned { border-left-color: var(--rh-pink); }
+.rh-cal-item.friend { border-left-color: var(--rh-pink); border-left-style: dashed; }
+.rh-cal-item.highlight { box-shadow: 0 0 0 3px rgba(255, 105, 180, 0.35); }
+
+/* Big selectable option buttons (e.g. who can see a run) */
+.rh-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1.5px solid var(--rh-line);
+  background: #fff;
+  color: var(--rh-ink);
+}
+.rh-option.selected { border-color: var(--rh-pink); background: var(--rh-pink-soft); }
+
+@media (max-width: 576px) {
+  .rh-cal-cell { min-height: 58px; padding: 4px; }
+  .rh-cal-chip { font-size: 0; padding: 4px; }
+  .rh-cal-chip svg { font-size: 10px; }
+}

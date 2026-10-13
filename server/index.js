@@ -498,7 +498,7 @@ app.get('/api/notifications/live', async (req, res) => {
     const [notifications, summary] = await Promise.all([
       Number.isInteger(after)
         ? db.any(`
-            SELECT n.id, n.message, n.type, n.run_id, n.created_at,
+            SELECT n.id, n.message, n.type, n.run_id, n.scheduled_run_id, n.created_at,
                    COALESCE(n.sender_username, u.first_name || ' ' || u.last_name) AS sender_username,
                    COALESCE(n.profile_icon, u.profile_picture) AS profile_icon
             FROM notifications n
@@ -1083,81 +1083,274 @@ app.get('/api/feed', async (req, res) => {
 // <!-- Calender Creation-->
 // *****************************************************
 
+// Scheduled runs visible to a user: their own, ones they've joined, and friends' public runs.
+// `extraFilter` narrows the result (e.g. a date range or a single run).
+const SCHEDULED_RUN_SELECT = `
+  SELECT
+    sr.id, sr.organizer_id, sr.start_time, sr.location, sr.expected_miles, sr.visibility, sr.notes,
+    u.first_name, u.last_name, u.profile_picture,
+    sr.start_time < NOW() AS is_past,
+    CASE
+      WHEN sr.organizer_id = $1 THEN 'organizer'
+      WHEN EXISTS (
+        SELECT 1 FROM scheduled_run_attendees a
+        WHERE a.scheduled_run_id = sr.id AND a.user_id = $1 AND a.status = 'going'
+      ) THEN 'attendee'
+      ELSE 'friend'
+    END AS role,
+    COALESCE((
+      SELECT json_agg(json_build_object(
+               'id', au.id, 'first_name', au.first_name,
+               'last_name', au.last_name, 'profile_picture', au.profile_picture
+             ) ORDER BY a.created_at)
+      FROM scheduled_run_attendees a
+      JOIN users au ON au.id = a.user_id
+      WHERE a.scheduled_run_id = sr.id AND a.status = 'going'
+    ), '[]') AS attendees
+  FROM scheduled_runs sr
+  JOIN users u ON u.id = sr.organizer_id
+  WHERE (
+    sr.organizer_id = $1
+    OR EXISTS (
+      SELECT 1 FROM scheduled_run_attendees a
+      WHERE a.scheduled_run_id = sr.id AND a.user_id = $1 AND a.status = 'going'
+    )
+    OR (sr.visibility = 'public' AND sr.organizer_id IN (
+      SELECT friend_id FROM friends WHERE user_id = $1 AND status = 'following'
+    ))
+  )
+`;
+
+// Calendar for a date range: your completed runs (from your run posts) and scheduled runs.
 app.get('/api/calender', async (req, res) => {
   const me = req.session.user?.id;
   if (!me) return res.status(401).json({ error: 'Unauthorized' });
 
+  const from = new Date(req.query.from);
+  const to = new Date(req.query.to);
+  if (isNaN(from) || isNaN(to)) {
+    return res.status(400).json({ error: 'from and to dates are required' });
+  }
+
   try {
-    const { from, to } = req.query;
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const [completed, scheduled] = await Promise.all([
+      db.any(`
+        SELECT id AS post_id, created_at, miles, duration_seconds, pace_seconds_per_mile,
+               location, content, image, visibility
+        FROM posts
+        WHERE user_id = $1 AND created_at >= $2 AND created_at < $3
+        ORDER BY created_at
+      `, [me, from, to]),
+      db.any(`${SCHEDULED_RUN_SELECT} AND sr.start_time >= $2 AND sr.start_time < $3 ORDER BY sr.start_time`,
+        [me, from, to]),
+    ]);
 
-    const fromISO = from ? new Date(from).toISOString() : monthStart.toISOString();
-    const toISO   = to   ? new Date(to).toISOString()   : monthEnd.toISOString();
-
-    // ===========================
-    // Get ALL scheduled runs visible to this user
-    // ===========================
-    const rows = await db.any(
-      `
-      WITH my_followed AS (
-        SELECT friend_id AS friend
-        FROM friends
-        WHERE user_id = $1 AND status = 'following'
-      )
-      SELECT
-        sr.id,
-        sr.organizer_id,
-        sr.start_time,
-        sr.location,
-        sr.expected_miles,
-        sr.visibility,
-        sr.notes,
-        u.first_name,
-        u.last_name,
-        u.profile_picture,
-        CASE
-          WHEN sr.organizer_id = $1 THEN 'organizer'
-          WHEN sra.user_id IS NOT NULL THEN 'attendee'
-          WHEN sr.visibility = 'public' AND sr.organizer_id IN (SELECT friend FROM my_followed) THEN 'friend_public'
-          ELSE 'other'
-        END AS role
-      FROM scheduled_runs sr
-      JOIN users u ON u.id = sr.organizer_id
-      
-      -- check if the current user has joined
-      LEFT JOIN scheduled_run_attendees sra
-        ON sra.scheduled_run_id = sr.id
-       AND sra.user_id = $1
-       AND sra.status IN ('going','maybe','invited')
-      
-      WHERE sr.start_time >= $2
-        AND sr.start_time <  $3
-        
-        AND (
-          sr.organizer_id = $1                   -- your runs
-          OR sra.user_id IS NOT NULL            -- runs you joined
-          OR (sr.visibility = 'public' AND sr.organizer_id IN (SELECT friend FROM my_followed)) -- public friend runs
-        )
-      
-      ORDER BY sr.start_time ASC;
-      `,
-      [me, fromISO, toISO]
-    );
-
-    res.json(rows);
+    res.json({ completed, scheduled });
   } catch (err) {
     console.error('❌ Error fetching calendar:', err);
     res.status(500).json({ error: 'Failed to fetch calendar' });
   }
 });
 
+app.get('/api/scheduled-runs/:id', async (req, res) => {
+  const me = req.session.user?.id;
+  if (!me) return res.status(401).json({ error: 'Unauthorized' });
 
+  try {
+    const run = await db.oneOrNone(`${SCHEDULED_RUN_SELECT} AND sr.id = $2`, [me, req.params.id]);
+    if (!run) return res.status(404).json({ error: 'Run not found' });
+    res.json(run);
+  } catch (err) {
+    console.error('❌ Error loading scheduled run:', err);
+    res.status(500).json({ error: 'Failed to load run' });
+  }
+});
 
+// Schedule a future run. Public runs are announced to your followers so they can join.
+app.post('/api/scheduled-runs', async (req, res) => {
+  const me = req.session.user;
+  if (!me) return res.status(401).json({ error: 'Unauthorized' });
 
+  const { location, notes } = req.body;
+  const startTime = new Date(req.body.start_time);
+  const miles = Number(req.body.expected_miles);
+  const visibility = req.body.visibility === 'public' ? 'public' : 'private';
 
+  if (isNaN(startTime) || startTime <= new Date()) {
+    return res.status(400).json({ error: 'Pick a date and time in the future' });
+  }
+  if (!location || !location.trim()) {
+    return res.status(400).json({ error: 'Add where you are running' });
+  }
+  if (!Number.isFinite(miles) || miles <= 0 || miles > 200) {
+    return res.status(400).json({ error: 'Expected miles must be more than 0' });
+  }
 
+  try {
+    const run = await db.one(`
+      INSERT INTO scheduled_runs (organizer_id, start_time, location, expected_miles, visibility, notes)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id
+    `, [me.id, startTime, location.trim(), miles, visibility, notes?.trim() || null]);
+
+    if (visibility === 'public') {
+      const followers = await db.any(`
+        SELECT u.id, u.phone_number
+        FROM friends f JOIN users u ON u.id = f.user_id
+        WHERE f.friend_id = $1 AND f.status = 'following'
+      `, [me.id]);
+      for (const follower of followers) {
+        await notify({
+          to: follower,
+          from: me,
+          scheduledRunId: run.id,
+          message: `scheduled a ${miles} mile run at ${location.trim()}. Want to join?`,
+          smsText: `${me.first_name} scheduled a ${miles} mile run at ${location.trim()}. Open RunHer to join.`,
+        });
+      }
+    }
+
+    res.status(201).json({ id: run.id });
+  } catch (err) {
+    console.error('❌ Error scheduling run:', err);
+    res.status(500).json({ error: 'Failed to schedule run' });
+  }
+});
+
+// Join a friend's public run. It shows up on your calendar and the group is notified.
+app.post('/api/scheduled-runs/:id/join', async (req, res) => {
+  const me = req.session.user;
+  if (!me) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const run = await db.oneOrNone(`
+      SELECT sr.id, sr.organizer_id, sr.location
+      FROM scheduled_runs sr
+      WHERE sr.id = $1
+        AND sr.visibility = 'public'
+        AND sr.start_time > NOW()
+        AND sr.organizer_id <> $2
+        AND EXISTS (
+          SELECT 1 FROM friends WHERE user_id = $2 AND friend_id = sr.organizer_id AND status = 'following'
+        )
+    `, [req.params.id, me.id]);
+    if (!run) return res.status(404).json({ error: "You can only join upcoming public runs from people you follow" });
+
+    await db.none(`
+      INSERT INTO scheduled_run_attendees (scheduled_run_id, user_id, status)
+      VALUES ($1, $2, 'going')
+      ON CONFLICT (scheduled_run_id, user_id) DO UPDATE SET status = 'going'
+    `, [run.id, me.id]);
+
+    const others = await db.any(`
+      SELECT u.id, u.phone_number, (u.id = $2) AS is_organizer
+      FROM users u
+      WHERE u.id = $2
+         OR u.id IN (SELECT user_id FROM scheduled_run_attendees WHERE scheduled_run_id = $1 AND status = 'going')
+    `, [run.id, run.organizer_id]);
+    for (const person of others.filter((p) => p.id !== me.id)) {
+      await notify({
+        to: person,
+        from: me,
+        scheduledRunId: run.id,
+        message: person.is_organizer
+          ? `is joining your run at ${run.location}!`
+          : `is also joining the run at ${run.location}.`,
+        smsText: `${me.first_name} is joining the run at ${run.location}.`,
+      });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('❌ Error joining run:', err);
+    res.status(500).json({ error: 'Failed to join run' });
+  }
+});
+
+app.post('/api/scheduled-runs/:id/leave', async (req, res) => {
+  const me = req.session.user;
+  if (!me) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const run = await db.oneOrNone(`
+      DELETE FROM scheduled_run_attendees a
+      USING scheduled_runs sr
+      WHERE a.scheduled_run_id = sr.id AND sr.id = $1 AND a.user_id = $2
+      RETURNING sr.id, sr.organizer_id, sr.location
+    `, [req.params.id, me.id]);
+    if (!run) return res.status(404).json({ error: "You haven't joined this run" });
+
+    const organizer = await db.one(`SELECT id, phone_number FROM users WHERE id = $1`, [run.organizer_id]);
+    await notify({
+      to: organizer,
+      from: me,
+      scheduledRunId: run.id,
+      message: `can't make your run at ${run.location} anymore.`,
+      smsText: `${me.first_name} can't make your run at ${run.location} anymore.`,
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('❌ Error leaving run:', err);
+    res.status(500).json({ error: 'Failed to leave run' });
+  }
+});
+
+// Cancel a run you organized. Anyone who joined is told it's off.
+app.delete('/api/scheduled-runs/:id', async (req, res) => {
+  const me = req.session.user;
+  if (!me) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const attendees = await db.any(`
+      SELECT u.id, u.phone_number
+      FROM scheduled_run_attendees a JOIN users u ON u.id = a.user_id
+      WHERE a.scheduled_run_id = $1 AND a.status = 'going'
+    `, [req.params.id]);
+
+    const run = await db.oneOrNone(`
+      DELETE FROM scheduled_runs WHERE id = $1 AND organizer_id = $2 RETURNING location
+    `, [req.params.id, me.id]);
+    if (!run) return res.status(404).json({ error: 'Run not found' });
+
+    // The run is gone, so these notifications don't link to it.
+    for (const attendee of attendees) {
+      await notify({
+        to: attendee,
+        from: me,
+        message: `canceled the run at ${run.location}.`,
+        smsText: `${me.first_name} canceled the run at ${run.location}.`,
+      });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('❌ Error canceling run:', err);
+    res.status(500).json({ error: 'Failed to cancel run' });
+  }
+});
+
+// A single run post, for the calendar's "View post". Visible to its owner, or to followers if public.
+app.get('/api/posts/item/:id', async (req, res) => {
+  const me = req.session.user?.id;
+  if (!me) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const post = await db.oneOrNone(`
+      SELECT p.*, u.first_name, u.last_name, u.profile_picture
+      FROM posts p JOIN users u ON u.id = p.user_id
+      WHERE p.id = $1
+        AND (p.user_id = $2 OR (p.visibility = 'public' AND EXISTS (
+          SELECT 1 FROM friends WHERE user_id = $2 AND friend_id = p.user_id AND status = 'following'
+        )))
+    `, [req.params.id, me]);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+    res.json(post);
+  } catch (err) {
+    console.error('❌ Error loading post:', err);
+    res.status(500).json({ error: 'Failed to load post' });
+  }
+});
 
 
 // *****************************************************

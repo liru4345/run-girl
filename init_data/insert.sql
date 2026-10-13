@@ -70,3 +70,13 @@ VALUES
 (2, 1),
 (3, 4),
 (4, 5);
+
+-- SCHEDULED RUNS (dated relative to when the database is created, so they're always upcoming)
+INSERT INTO scheduled_runs (organizer_id, start_time, location, expected_miles, visibility, notes)
+VALUES
+(2, date_trunc('day', NOW()) + INTERVAL '2 days 13 hours', 'Boulder Creek Path', 4.00, 'public', 'Easy pace, coffee after ☕'),
+(3, date_trunc('day', NOW()) + INTERVAL '4 days 14 hours 30 minutes', 'Chautauqua Park', 6.00, 'public', 'Hilly trail run, bring water'),
+(1, date_trunc('day', NOW()) + INTERVAL '3 days 12 hours', 'Main Campus', 3.00, 'private', 'Recovery run');
+
+INSERT INTO scheduled_run_attendees (scheduled_run_id, user_id, status)
+VALUES (2, 4, 'going');

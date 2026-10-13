@@ -13,14 +13,15 @@ function createNotifier(db) {
    *        the runner the alert is about, or null for alerts from RunHer itself
    * @param {string} opts.message  in-app text, shown after the sender's name
    * @param {string} opts.smsText  full text-message version
-   * @param {number} opts.runId
+   * @param {number} [opts.runId]           a live run this is about
+   * @param {number} [opts.scheduledRunId]  a planned run this is about
    * @param {'run'|'run_alert'} [opts.type]  run_alert is shown as urgent
    */
-  return async function notify({ to, from, message, smsText, runId, type = 'run' }) {
+  return async function notify({ to, from, message, smsText, runId = null, scheduledRunId = null, type = 'run' }) {
     try {
       await db.none(`
-        INSERT INTO notifications (sender_id, receiver_id, sender_username, profile_icon, message, type, run_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO notifications (sender_id, receiver_id, sender_username, profile_icon, message, type, run_id, scheduled_run_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       `, [
         from?.id ?? null,
         to.id,
@@ -29,6 +30,7 @@ function createNotifier(db) {
         message,
         type,
         runId,
+        scheduledRunId,
       ]);
     } catch (err) {
       console.error(`❌ Failed to save notification for user ${to.id}:`, err.message);

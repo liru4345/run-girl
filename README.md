@@ -26,6 +26,12 @@ stateDiagram-v2
 
 Every alert goes through one function, `notify()` in `server/notify.js`, which saves it as an in-app notification. While RunHer is open, new notifications pop up within a few seconds (and as a system notification if the tab is in the background); the rest wait under the 🔔 bell with an unread count. Text messages are an optional second channel behind `SMS_ENABLED`, so adding push notifications or Twilio later means adding a channel, not touching the safety logic.
 
+### Calendar and group runs
+
+- Every finished run shows up on your calendar on the day you ran it. Click it to open the post.
+- Schedule future runs as **private** (only on your calendar) or **public** (your followers are invited).
+- Friends can **join** a public run. It goes on their calendar, and the organizer and other runners are notified. Joiners can drop out, and organizers can cancel (everyone who joined is told).
+
 ### Overdue detection
 
 The overdue check runs on the server every 15 seconds (`server/safety.js`), so alerts still go out if the runner's phone dies or the app is closed. Each step claims its runs with a single `UPDATE ... RETURNING` statement, so an alert is sent exactly once even if checks overlap or several server instances are running.
@@ -77,6 +83,10 @@ Then open http://localhost:3000.
 | `POST` | `/api/runs/finish` | Save the recap and complete the run |
 | `GET` | `/api/runs/watching` | Friends' active runs you're watching |
 | `GET` | `/api/notifications/live?after=` | New notifications for pop-ups, plus the unread count |
+| `GET` | `/api/calender?from=&to=` | Completed runs and scheduled runs for a date range |
+| `POST` | `/api/scheduled-runs` | Schedule a private or public run |
+| `POST` | `/api/scheduled-runs/:id/join` · `/leave` | Join or leave a friend's public run |
+| `DELETE` | `/api/scheduled-runs/:id` | Cancel a run you organized |
 
 ## Roadmap
 

@@ -134,6 +134,15 @@ const Notifications = () => {
                       )}
                     </div>
                   )}
+                  {notif.scheduled_run_id && (
+                    <Link
+                      to={`/calender?run=${notif.scheduled_run_id}`}
+                      className="rh-btn rh-btn-secondary mt-2"
+                      style={{ padding: '6px 14px' }}
+                    >
+                      View in calendar
+                    </Link>
+                  )}
                   {notif.run_id && !fromRunHer && (
                     <Link
                       to={`/track/${notif.run_id}`}

@@ -95,6 +95,9 @@ const Header = () => {
           <NavLink to="/friends" className={navClass}>
             <FaUserFriends /> <span className="d-none d-md-inline">Friends</span>
           </NavLink>
+          <NavLink to="/calender" className={navClass}>
+            <FaCalendarAlt /> <span className="d-none d-md-inline">Calendar</span>
+          </NavLink>
         </div>
 
         <div className="d-flex align-items-center gap-2 ms-auto">
