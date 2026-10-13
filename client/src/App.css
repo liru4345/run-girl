@@ -414,13 +414,96 @@
   .rh-timer { font-size: 3.2rem; }
   .rh-stat-value { font-size: 1.1rem; }
 }
-/* Logged-out header: light and minimal */
-.rh-public-nav {
+/* Top bar (logged in and logged out) */
+.rh-nav {
   background: #fff;
   border-bottom: 1px solid var(--rh-line);
-  padding: 14px 0;
-  min-height: 70px;
+  padding: 12px 0;
+  min-height: 66px;
+  position: sticky;
+  top: 0;
+  z-index: 1030;
 }
+.rh-nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  color: var(--rh-muted);
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.rh-nav-link:hover { color: var(--rh-ink); background: #f6f6fa; }
+.rh-nav-link.active { color: var(--rh-pink-dark); background: var(--rh-pink-soft); }
+.rh-icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--rh-muted);
+  font-size: 1.1rem;
+  text-decoration: none;
+}
+.rh-icon-btn:hover { background: #f6f6fa; color: var(--rh-ink); }
+.rh-icon-btn.active { background: var(--rh-pink-soft); color: var(--rh-pink-dark); }
+.rh-badge {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #f0436b;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+}
+.rh-avatar-btn {
+  border: 2px solid transparent;
+  border-radius: 50%;
+  padding: 1px;
+  background: none;
+  display: inline-flex;
+}
+.rh-avatar-btn:hover, .rh-avatar-btn[aria-expanded="true"] { border-color: var(--rh-pink); }
+.rh-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 220px;
+  background: #fff;
+  border: 1px solid var(--rh-line);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(31, 31, 41, 0.14);
+  padding: 6px;
+  z-index: 1050;
+}
+.rh-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--rh-ink);
+  text-decoration: none;
+  font-weight: 500;
+  text-align: left;
+}
+.rh-menu-item:hover { background: var(--rh-pink-soft); color: var(--rh-pink-dark); }
+.rh-menu-item svg { color: var(--rh-muted); }
+
 /* The logo file is white; tint it pink for light backgrounds */
 .rh-logo-pink {
   height: 38px;

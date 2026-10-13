@@ -1,11 +1,16 @@
-import React, { useEffect, useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import { FaBell } from "react-icons/fa"; // Import bell icon
+import React, { useEffect, useRef, useState } from "react";
+import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
+import { FaBell, FaHome, FaUserFriends, FaRunning, FaUser, FaCalendarAlt, FaSignOutAlt } from "react-icons/fa";
+import Avatar from "./avatar";
 import { UNREAD_EVENT } from "./notificationToaster";
 
 const Header = () => {
   const [user, setUser] = useState(undefined); // undefined until we know whether someone is logged in
   const [unreadCount, setUnreadCount] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   // The notification poller broadcasts the unread count; show it on the bell.
   useEffect(() => {
@@ -13,8 +18,6 @@ const Header = () => {
     window.addEventListener(UNREAD_EVENT, onUnread);
     return () => window.removeEventListener(UNREAD_EVENT, onUnread);
   }, []);
-  const navigate = useNavigate();
-  const { pathname } = useLocation();
 
   // Re-check who is logged in on every page change and whenever the tab regains focus,
   // so the header never shows a stale user after logging in or out (including in another tab).
@@ -29,24 +32,40 @@ const Header = () => {
     };
 
     fetchUser();
+    setMenuOpen(false);
     window.addEventListener("focus", fetchUser);
     return () => window.removeEventListener("focus", fetchUser);
   }, [pathname]);
 
+  // Close the profile menu when clicking anywhere else.
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onClick = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [menuOpen]);
+
   const handleLogout = async () => {
     await fetch("/api/logout", { credentials: 'include' });
     setUser(null);
+    setMenuOpen(false);
     navigate("/login");
   };
 
-  // Logged-out visitors get a light, minimal bar; the pink app bar is for people using the app.
+  const logo = (
+    <Link to={user ? "/feed" : "/"} aria-label="RunHer home">
+      <img src="/img/runHerLogo2.png" alt="RunHer" className="rh-logo-pink" />
+    </Link>
+  );
+
+  // Logged-out visitors: logo plus Log in / Get started.
   if (!user) {
     return (
-      <nav className="rh-public-nav">
+      <nav className="rh-nav">
         <div className="container d-flex align-items-center justify-content-between">
-          <Link to="/" aria-label="RunHer home">
-            <img src="/img/runHerLogo2.png" alt="RunHer" className="rh-logo-pink" />
-          </Link>
+          {logo}
           {user === null && (
             <div className="d-flex align-items-center gap-2">
               {pathname !== "/login" && (
@@ -62,44 +81,62 @@ const Header = () => {
     );
   }
 
+  const navClass = ({ isActive }) => `rh-nav-link ${isActive ? "active" : ""}`;
+
   return (
-    <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
-      <div className="container">
-        <Link className="navbar-brand" to="/">
-          <img
-            src="/img/runHerLogo2.png"
-            alt="RunHer"
-            height="40"
-            style={{ objectFit: 'contain', maxWidth: '150px' }}
-          />
-        </Link>
-        <Link to="/start-run" className="btn btn-outline-light btn-sm ms-2">
-          Start Run
-        </Link>
-        <div className="collapse navbar-collapse">
-          <ul className="navbar-nav ms-auto align-items-center">
-            <li className="nav-item">
-              <Link className="nav-link" to="/feed">Friends</Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link" to="/profile">{user.first_name}</Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link position-relative" to="/notifications" aria-label={`Notifications (${unreadCount} unread)`}>
-                <FaBell />
-                {unreadCount > 0 && (
-                  <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style={{ fontSize: "0.65rem" }}>
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </span>
-                )}
-              </Link>
-            </li>
-            <li className="nav-item">
-              <button className="btn btn-outline-light btn-sm ms-2" onClick={handleLogout}>
-                Logout
-              </button>
-            </li>
-          </ul>
+    <nav className="rh-nav">
+      <div className="container d-flex align-items-center gap-3">
+        {logo}
+
+        <div className="d-flex align-items-center gap-1 ms-md-3">
+          <NavLink to="/feed" className={navClass}>
+            <FaHome /> <span className="d-none d-md-inline">Feed</span>
+          </NavLink>
+          <NavLink to="/friends" className={navClass}>
+            <FaUserFriends /> <span className="d-none d-md-inline">Friends</span>
+          </NavLink>
+        </div>
+
+        <div className="d-flex align-items-center gap-2 ms-auto">
+          <Link to="/start-run" className="rh-btn rh-btn-primary" style={{ padding: "8px 18px" }}>
+            <FaRunning /> <span className="d-none d-sm-inline">Start run</span>
+          </Link>
+
+          <NavLink
+            to="/notifications"
+            className={({ isActive }) => `rh-icon-btn position-relative ${isActive ? "active" : ""}`}
+            aria-label={`Notifications (${unreadCount} unread)`}
+          >
+            <FaBell />
+            {unreadCount > 0 && <span className="rh-badge">{unreadCount > 9 ? "9+" : unreadCount}</span>}
+          </NavLink>
+
+          <div className="position-relative" ref={menuRef}>
+            <button
+              type="button"
+              className="rh-avatar-btn"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              aria-label="Account menu"
+            >
+              <Avatar src={user.profile_picture} firstName={user.first_name} lastName={user.last_name} size={38} />
+            </button>
+
+            {menuOpen && (
+              <div className="rh-menu" role="menu">
+                <div className="px-3 py-2 border-bottom mb-1">
+                  <div className="fw-semibold">{user.first_name} {user.last_name}</div>
+                  <div className="rh-subtle small text-truncate">{user.email}</div>
+                </div>
+                <Link to="/profile" className="rh-menu-item" role="menuitem"><FaUser /> Your profile</Link>
+                <Link to="/calender" className="rh-menu-item" role="menuitem"><FaCalendarAlt /> Calendar</Link>
+                <button type="button" className="rh-menu-item" role="menuitem" onClick={handleLogout}>
+                  <FaSignOutAlt /> Log out
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </nav>

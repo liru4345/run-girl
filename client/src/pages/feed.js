@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FaSearch, FaRunning } from 'react-icons/fa';
+import { FaRunning } from 'react-icons/fa';
 import PostCard from '../components/postCard';
 
 const Feed = () => {
@@ -27,14 +27,9 @@ const Feed = () => {
 
   return (
     <div className="rh-page mt-4 mb-5" style={{ maxWidth: 640 }}>
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <div>
-          <h2 className="fw-bold mb-1">Feed</h2>
-          <div className="rh-subtle">Runs from people you follow</div>
-        </div>
-        <Link to="/friends" className="rh-btn rh-btn-secondary">
-          <FaSearch /> Find friends
-        </Link>
+      <div className="mb-4">
+        <h2 className="fw-bold mb-1">Feed</h2>
+        <div className="rh-subtle">Runs from people you follow</div>
       </div>
 
       <Link to="/start-run" className="rh-card d-flex align-items-center gap-3 mb-4 text-decoration-none">
