@@ -75,7 +75,7 @@ const Homepage = () => {
 
         <div className="col-lg-6">
           <div className="rh-hero-visual">
-            <img src="/img/pic2.jpeg" alt="A woman running by a lake" className="rh-hero-photo" />
+            <img src="/img/hero-runner.jpg" alt="A smiling woman running on a trail at sunset" className="rh-hero-photo" style={{ objectPosition: "52% 30%" }} />
 
             <div className="rh-float-card" style={{ top: 24, left: -12 }}>
               <span className="rh-live-dot" style={{ background: "var(--rh-pink)" }} />
