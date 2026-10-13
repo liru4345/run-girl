@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
+import Avatar from '../components/avatar';
 
 const Profile = () => {
   const [user, setUser] = useState(null);
@@ -125,7 +126,7 @@ const Profile = () => {
         <div className="col-md-8">
           <div className="card shadow p-4 text-center">
             <div className="d-flex justify-content-center mb-3">
-              <img src={user.profile_picture || "https://via.placeholder.com/150"} alt="Profile" className="rounded-circle" width={150} height={150} />
+              <Avatar src={user.profile_picture} firstName={user.first_name} lastName={user.last_name} size={150} />
             </div>
             <h3 className="mb-1">{user.first_name} {user.last_name}</h3>
             <p className="text-muted mb-2">@{user.email ? user.email.split("@")[0] : `${user.first_name}${user.last_name}`}</p>
@@ -202,7 +203,7 @@ const Profile = () => {
                   </div>
                   <div className="mb-3">
                     <label className="form-label">Profile Picture</label>
-                    <input type="file" className="form-control" name="profile_picture" onChange={handleChange} />
+                    <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="form-control" name="profile_picture" onChange={handleChange} />
                   </div>
                 </form>
               </div>

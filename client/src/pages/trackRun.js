@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import Avatar from '../components/avatar';
 
 // Live status page for a run, shown to the runner and their watchers.
 const REFRESH_MS = 15000;
@@ -56,8 +57,19 @@ const TrackRun = () => {
 
   return (
     <div className="container mt-5" style={{ maxWidth: 720 }}>
-      <h3>{run.first_name} {run.last_name}'s run</h3>
-      <span className={`badge ${statusStyle.className} mb-3`}>{statusStyle.label}</span>
+      <div className="d-flex align-items-center mb-3">
+        <Avatar
+          src={run.profile_picture}
+          firstName={run.first_name}
+          lastName={run.last_name}
+          size={64}
+          className="me-3"
+        />
+        <div>
+          <h3 className="mb-1">{run.first_name} {run.last_name}'s run</h3>
+          <span className={`badge ${statusStyle.className}`}>{statusStyle.label}</span>
+        </div>
+      </div>
 
       <ul className="list-unstyled">
         <li><strong>Planned location:</strong> {run.location}</li>

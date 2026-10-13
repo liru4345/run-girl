@@ -2,11 +2,11 @@
 -- Demo accounts: every sample user's password is "runher-demo" (stored as a bcrypt hash)
 INSERT INTO users (first_name, last_name, email, password, phone_number, profile_picture, bio, followers_count, following_count)
 VALUES
-('Kylie', 'Small', 'kylie@example.com', '$2b$10$4A1Ujmol9D4gT1Fu0LSCFumYficdRkddi.496kR1GwrrNCZL0y5Gy', '555-123-4567', '/images/lizzie.png', 'Runner & CS student at CU Boulder.', 2, 3),
-('Alex', 'Johnson', 'alexj@example.com', '$2b$10$4A1Ujmol9D4gT1Fu0LSCFumYficdRkddi.496kR1GwrrNCZL0y5Gy', '555-234-5678', '/images/alex.jpg', 'Marathoner & coffee lover.', 1, 2),
-('Maria', 'Lopez', 'maria.lopez@example.com', '$2b$10$4A1Ujmol9D4gT1Fu0LSCFumYficdRkddi.496kR1GwrrNCZL0y5Gy', '555-345-6789', '/images/maria.png', 'Trail runner and data scientist.', 3, 1),
-('James', 'Lee', 'james.lee@example.com', '$2b$10$4A1Ujmol9D4gT1Fu0LSCFumYficdRkddi.496kR1GwrrNCZL0y5Gy', '555-456-7890', '/images/james.png', 'Training for my first half marathon.', 1, 2),
-('Sophia', 'Chen', 'sophia.chen@example.com', '$2b$10$4A1Ujmol9D4gT1Fu0LSCFumYficdRkddi.496kR1GwrrNCZL0y5Gy', '555-567-8901', '/images/sophia.jpg', 'Night runner 🌙. Love hiking too.', 0, 1);
+('Kylie', 'Small', 'kylie@example.com', '$2b$10$4A1Ujmol9D4gT1Fu0LSCFumYficdRkddi.496kR1GwrrNCZL0y5Gy', '555-123-4567', '/img/pic2.jpeg', 'Runner & CS student at CU Boulder.', 2, 3),
+('Alex', 'Johnson', 'alexj@example.com', '$2b$10$4A1Ujmol9D4gT1Fu0LSCFumYficdRkddi.496kR1GwrrNCZL0y5Gy', '555-234-5678', '/img/pic3.jpeg', 'Marathoner & coffee lover.', 1, 2),
+('Maria', 'Lopez', 'maria.lopez@example.com', '$2b$10$4A1Ujmol9D4gT1Fu0LSCFumYficdRkddi.496kR1GwrrNCZL0y5Gy', '555-345-6789', '/img/pic4.jpeg', 'Trail runner and data scientist.', 3, 1),
+('James', 'Lee', 'james.lee@example.com', '$2b$10$4A1Ujmol9D4gT1Fu0LSCFumYficdRkddi.496kR1GwrrNCZL0y5Gy', '555-456-7890', '/img/pic5.jpg', 'Training for my first half marathon.', 1, 2),
+('Sophia', 'Chen', 'sophia.chen@example.com', '$2b$10$4A1Ujmol9D4gT1Fu0LSCFumYficdRkddi.496kR1GwrrNCZL0y5Gy', '555-567-8901', '/img/pic6.jpeg', 'Night runner 🌙. Love hiking too.', 0, 1);
 
 -- FRIENDS
 INSERT INTO friends (user_id, friend_id, status)
@@ -48,10 +48,10 @@ VALUES
 -- NOTIFICATIONS
 INSERT INTO notifications (sender_id, receiver_id, sender_username, profile_icon, message, type, is_read)
 VALUES
-(2, 1, 'AlexJ', '/images/alex.jpg', 'Alex sent you a follow request.', 'follow_request', FALSE),
-(3, 1, 'MariaL', '/images/maria.png', 'Maria liked your post.', 'general', TRUE),
-(1, 2, 'LizzieR', '/images/lizzie.png', 'Lizzie accepted your friend request.', 'general', FALSE),
-(4, 3, 'JamesL', '/images/james.png', 'James commented on your post.', 'general', TRUE);
+(2, 1, 'AlexJ', '/img/pic3.jpeg', 'Alex sent you a follow request.', 'follow_request', FALSE),
+(3, 1, 'MariaL', '/img/pic4.jpeg', 'Maria liked your post.', 'general', TRUE),
+(1, 2, 'LizzieR', '/img/pic2.jpeg', 'Lizzie accepted your friend request.', 'general', FALSE),
+(4, 3, 'JamesL', '/img/pic5.jpg', 'James commented on your post.', 'general', TRUE);
 
 -- RUNS
 INSERT INTO runs (user_id, location, duration_minutes, start_time, end_time, status)

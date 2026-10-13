@@ -337,6 +337,7 @@ const StartRun = () => {
                 <label className="form-label">Photo (optional)</label>
                 <input
                   type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
                   className="form-control"
                   onChange={(e) => setPhoto(e.target.files[0])}
                 />

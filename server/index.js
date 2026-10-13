@@ -657,7 +657,7 @@ app.get('/api/runs/watching', async (req, res) => {
 
   try {
     const runs = await db.any(`
-      SELECT r.id, r.status, r.location, r.end_time, u.first_name, u.last_name
+      SELECT r.id, r.status, r.location, r.end_time, u.first_name, u.last_name, u.profile_picture
       FROM run_watchers rw
       JOIN runs r ON r.id = rw.run_id
       JOIN users u ON u.id = r.user_id
@@ -679,7 +679,7 @@ app.get('/api/runs/:id/track', async (req, res) => {
   try {
     const run = await db.oneOrNone(`
       SELECT r.id, r.user_id, r.location, r.start_time, r.end_time, r.finished_at, r.status,
-             r.last_lat, r.last_lng, r.last_location_at, u.first_name, u.last_name
+             r.last_lat, r.last_lng, r.last_location_at, u.first_name, u.last_name, u.profile_picture
       FROM runs r
       JOIN users u ON u.id = r.user_id
       WHERE r.id = $1
@@ -767,7 +767,13 @@ const storage = multer.diskStorage({
     cb(null, uniqueName);
   },
 });
-const upload = multer({ storage });
+// Only accept image formats every browser can display (e.g. iPhone HEIC photos won't show in Chrome).
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, ALLOWED_IMAGE_TYPES.includes(file.mimetype)),
+});
 
 // Finish a run: save the recap post, close out the run, and tell that run's watchers.
 app.post('/api/runs/finish', upload.single('photo'), async (req, res) => {
