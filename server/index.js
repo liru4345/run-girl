@@ -182,13 +182,15 @@ app.get('/api/profile', async (req, res) => {
   if (!user) return res.status(401).send({ error: 'Unauthorized' });
 
   try {
-    const [followersCount, followingCount] = await Promise.all([
+    const [followersCount, followingCount, contact] = await Promise.all([
       db.one(`SELECT COUNT(*) FROM friends WHERE friend_id = $1 AND status = 'following'`, [user.id]),
-      db.one(`SELECT COUNT(*) FROM friends WHERE user_id = $1 AND status = 'following'`, [user.id])
+      db.one(`SELECT COUNT(*) FROM friends WHERE user_id = $1 AND status = 'following'`, [user.id]),
+      db.one(`SELECT phone_number FROM users WHERE id = $1`, [user.id])
     ]);
 
     res.status(200).send({
       ...user,
+      phone_number: contact.phone_number,
       followers_count: parseInt(followersCount.count),
       following_count: parseInt(followingCount.count)
     });
@@ -838,7 +840,8 @@ app.post('/api/profile/update', upload.single('profile_picture'), async (req, re
       'first_name = $1',
       'last_name = $2',
       'email = $3',
-      'phone_number = $4',
+      // Never blank out the phone number: watchers' safety alerts depend on it.
+      "phone_number = COALESCE(NULLIF($4, ''), phone_number)",
       'bio = $5'
     ];
     const updateValues = [first_name, last_name, email, phone_number, bio];

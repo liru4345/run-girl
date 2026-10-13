@@ -24,6 +24,10 @@ function smsAddress(phoneNumber, carrier = 'att') {
 }
 
 async function sendSms(phoneNumber, text) {
+  if (!(phoneNumber || '').replace(/[^0-9]/g, '')) {
+    console.warn(`⚠️ Skipping SMS, no phone number on file: ${text}`);
+    return;
+  }
   const to = smsAddress(phoneNumber);
 
   if (process.env.SMS_DRY_RUN === 'true') {
