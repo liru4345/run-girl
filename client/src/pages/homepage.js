@@ -98,6 +98,13 @@ const Homepage = () => {
               <div className="fw-semibold small">Call or text in one tap</div>
             </div>
           </div>
+          {/* Required by the Magnific free license: credit next to the image with a link. */}
+          <p className="rh-subtle small text-end mt-2 mb-0 pe-3">
+            Photo designed by{" "}
+            <a href="https://www.magnific.com" target="_blank" rel="noreferrer" style={{ color: "var(--rh-pink-dark)" }}>
+              Magnific
+            </a>
+          </p>
         </div>
       </section>
 
