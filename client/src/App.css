@@ -414,3 +414,17 @@
   .rh-timer { font-size: 3.2rem; }
   .rh-stat-value { font-size: 1.1rem; }
 }
+/* Logged-out header: light and minimal */
+.rh-public-nav {
+  background: #fff;
+  border-bottom: 1px solid var(--rh-line);
+  padding: 14px 0;
+  min-height: 70px;
+}
+/* The logo file is white; tint it pink for light backgrounds */
+.rh-logo-pink {
+  height: 38px;
+  max-width: 150px;
+  object-fit: contain;
+  filter: brightness(0) saturate(100%) invert(58%) sepia(64%) saturate(2364%) hue-rotate(296deg) brightness(101%) contrast(101%);
+}
