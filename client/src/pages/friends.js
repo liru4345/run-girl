@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { Link } from 'react-router-dom';
-import { FaSearch, FaUserPlus, FaUserCheck, FaClock } from "react-icons/fa";
+import { FaSearch, FaUserPlus, FaUserCheck, FaUserTimes, FaClock } from "react-icons/fa";
 import Avatar from "../components/avatar";
 
 function Friends() {
@@ -111,12 +111,15 @@ function Friends() {
               <Link to={`/profile/${user.id}`} className="rh-person-name text-decoration-none">
                 {user.name}
               </Link>
+              {user.follows_you && (
+                <span className="rh-status-pill off ms-2" style={{ padding: "2px 8px", fontSize: "0.72rem" }}>Follows you</span>
+              )}
               {user.bio && <div className="rh-subtle small text-truncate">{user.bio}</div>}
             </div>
 
             {user.status === "none" && (
               <button className="rh-btn rh-btn-primary" onClick={() => handleAction(user.id, "request")}>
-                <FaUserPlus /> Follow
+                <FaUserPlus /> {user.follows_you ? "Follow back" : "Follow"}
               </button>
             )}
             {user.status === "requested" && (
@@ -126,11 +129,12 @@ function Friends() {
             )}
             {user.status === "following" && (
               <button
-                className="rh-btn rh-btn-secondary"
+                className="rh-btn rh-btn-secondary rh-unfollow"
                 onClick={() => handleAction(user.id, "unfollow")}
-                title="Unfollow"
+                aria-label={`Unfollow ${user.name}`}
               >
-                <FaUserCheck /> Following
+                <span className="rh-when-idle"><FaUserCheck /> Following</span>
+                <span className="rh-when-hover"><FaUserTimes /> Unfollow</span>
               </button>
             )}
           </div>

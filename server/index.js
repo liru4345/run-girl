@@ -249,6 +249,12 @@ app.get('/api/friends/search', async (req, res) => {
       statusMap[row.friend_id] = row.status;
     });
 
+    // People who already follow you get a "Follow back" button.
+    const followers = await db.any(
+      `SELECT user_id FROM friends WHERE friend_id = $1 AND status = 'following'`, [currentUserId]
+    );
+    const followsYou = new Set(followers.map(row => row.user_id));
+
     const results = users.map(user => ({
       id: user.id,
       name: `${user.first_name} ${user.last_name}`,
@@ -256,7 +262,8 @@ app.get('/api/friends/search', async (req, res) => {
       last_name: user.last_name,
       profile_picture: user.profile_picture,
       bio: user.bio,
-      status: statusMap[user.id] || 'none'
+      status: statusMap[user.id] || 'none',
+      follows_you: followsYou.has(user.id),
     }));
 
     res.json(results);
@@ -338,20 +345,10 @@ app.post('/api/friends/unfollow', async (req, res) => {
   if (!currentUserId) return res.status(401).send({ error: 'Unauthorized' });
 
   try {
+    // Follower/following counts are computed from this table, so deleting the row is all it takes.
     await db.none(`
       DELETE FROM friends WHERE user_id = $1 AND friend_id = $2
     `, [currentUserId, userId]);
-
-    // Step 2: Update counts
-    await db.none(`
-      UPDATE users SET following_count = GREATEST(COALESCE(following_count, 1) - 1, 0)
-      WHERE id = $1
-    `, [userId]);
-
-    await db.none(`
-      UPDATE users SET followers_count = GREATEST(COALESCE(followers_count, 1) - 1, 0)
-      WHERE id = $1
-    `, [unfollowUserId]);
 
     res.sendStatus(200);
   } catch (err) {

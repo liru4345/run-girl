@@ -637,3 +637,10 @@
   border-radius: 14px;
   padding: 8px 12px;
 }
+
+/* "Following" turns into "Unfollow" on hover */
+.rh-unfollow .rh-when-hover { display: none; }
+.rh-unfollow:hover .rh-when-idle { display: none; }
+.rh-unfollow:hover .rh-when-hover { display: inline-flex; align-items: center; gap: 8px; }
+.rh-unfollow .rh-when-idle { display: inline-flex; align-items: center; gap: 8px; }
+.rh-unfollow:hover { border-color: #f0436b; color: #f0436b; }

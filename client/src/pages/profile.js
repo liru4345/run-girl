@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
-import { FaPen, FaCalendarAlt, FaUserPlus, FaUserCheck, FaClock, FaLock } from 'react-icons/fa';
+import { FaPen, FaCalendarAlt, FaUserPlus, FaUserCheck, FaUserTimes, FaClock, FaLock } from 'react-icons/fa';
 import Avatar from '../components/avatar';
 import PostCard from '../components/postCard';
 
@@ -185,8 +185,9 @@ const Profile = () => {
                   <FaClock /> Requested
                 </button>
               ) : user.status === 'following' ? (
-                <button className="rh-btn rh-btn-secondary" onClick={() => handleAction(user.id, 'unfollow')}>
-                  <FaUserCheck /> Following
+                <button className="rh-btn rh-btn-secondary rh-unfollow" onClick={() => handleAction(user.id, 'unfollow')} aria-label={`Unfollow ${user.first_name}`}>
+                  <span className="rh-when-idle"><FaUserCheck /> Following</span>
+                  <span className="rh-when-hover"><FaUserTimes /> Unfollow</span>
                 </button>
               ) : (
                 <button className="rh-btn rh-btn-primary" onClick={() => handleAction(user.id, 'request')}>
