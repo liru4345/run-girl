@@ -487,7 +487,8 @@ app.post('/api/notifications/dismiss/:id', async (req, res) => {
 // Without ?after it only returns the latest id, so old notifications don't pop up on page load.
 app.get('/api/notifications/live', async (req, res) => {
   const userId = req.session.user?.id;
-  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+  // Polled every few seconds on every page, so logged-out visitors get a quiet empty answer.
+  if (!userId) return res.json({ logged_in: false, notifications: [], latest_id: null, unread_count: 0 });
 
   try {
     const after = Number(req.query.after);
@@ -756,7 +757,8 @@ app.post('/api/runs/:id/checkin', async (req, res) => {
 // Active runs the logged-in user is watching (powers the in-app "on a run" banner).
 app.get('/api/runs/watching', async (req, res) => {
   const userId = req.session.user?.id;
-  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+  // Polled on every page; logged-out visitors simply aren't watching anyone.
+  if (!userId) return res.json({ runs: [] });
 
   try {
     const runs = await db.any(`

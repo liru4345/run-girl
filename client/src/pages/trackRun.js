@@ -4,7 +4,7 @@ import { FaPhoneAlt, FaCommentDots, FaMapMarkerAlt, FaExternalLinkAlt, FaCheckCi
 import Avatar from '../components/avatar';
 
 // Live status page for a run, shown to the runner and their watchers.
-const REFRESH_MS = 15000;
+const REFRESH_MS = 5000;
 
 const STATUS = {
   in_progress: { label: 'Out running', hero: '', icon: null },
@@ -12,11 +12,8 @@ const STATUS = {
   completed: { label: 'Finished safely', hero: 'done', icon: <FaCheckCircle /> },
 };
 
-const mapEmbedUrl = (lat, lng) => {
-  const d = 0.004;
-  const bbox = [lng - d, lat - d, lng + d, lat + d].join(',');
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`;
-};
+// Google's keyless map embed (OpenStreetMap's tile servers were unreliable to embed).
+const mapEmbedUrl = (lat, lng) => `https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`;
 
 const timeAgo = (timestamp) => {
   const seconds = Math.round((Date.now() - new Date(timestamp)) / 1000);
@@ -137,7 +134,7 @@ const TrackRun = () => {
           <div>
             <div className="fw-semibold">{finished ? 'Last known location' : 'Live location'}</div>
             <div className="rh-subtle small">
-              {hasLocation ? `Updated ${timeAgo(run.last_location_at)}` : 'Updates every 15 seconds while sharing'}
+              {hasLocation ? `Updated ${timeAgo(run.last_location_at)}` : 'Updates every few seconds while sharing'}
             </div>
           </div>
           {hasLocation && (

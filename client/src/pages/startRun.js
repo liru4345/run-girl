@@ -96,20 +96,6 @@ const StartRun = () => {
       return undefined;
     }
 
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        latestPositionRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setLocationStatus({ sharing: true, text: 'Sharing live location' });
-      },
-      (err) => {
-        setLocationStatus({
-          sharing: false,
-          text: err.code === err.PERMISSION_DENIED ? 'Location off · watchers see your planned spot' : 'Finding your location…',
-        });
-      },
-      { enableHighAccuracy: true, maximumAge: 10000 }
-    );
-
     const sendLocation = () => {
       const position = latestPositionRef.current;
       if (!position) return;
@@ -120,6 +106,27 @@ const StartRun = () => {
         body: JSON.stringify(position),
       }).catch((err) => console.error('❌ Location update failed:', err));
     };
+
+    let sentFirstFix = false;
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        latestPositionRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setLocationStatus({ sharing: true, text: 'Sharing live location' });
+        // Send the first fix right away so watchers see the map immediately; then every 15s.
+        if (!sentFirstFix) {
+          sentFirstFix = true;
+          sendLocation();
+        }
+      },
+      (err) => {
+        setLocationStatus({
+          sharing: false,
+          text: err.code === err.PERMISSION_DENIED ? 'Location off · watchers see your planned spot' : 'Finding your location…',
+        });
+      },
+      { enableHighAccuracy: true, maximumAge: 10000 }
+    );
+
     const pinger = setInterval(sendLocation, LOCATION_PING_MS);
 
     return () => {

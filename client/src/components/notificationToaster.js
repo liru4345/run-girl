@@ -80,13 +80,13 @@ const NotificationToaster = () => {
         const res = await fetch(`/api/notifications/live${after != null ? `?after=${after}` : ""}`, { credentials: "include" });
         if (cancelled) return;
 
-        if (!res.ok) {
+        const data = res.ok ? await res.json() : { logged_in: false };
+        if (data.logged_in === false) {
           lastIdRef.current = null; // logged out: start fresh on the next login
           setLoggedIn(false);
           return;
         }
 
-        const data = await res.json();
         setLoggedIn(true);
         lastIdRef.current = data.latest_id;
         window.dispatchEvent(new CustomEvent(UNREAD_EVENT, { detail: data.unread_count }));
