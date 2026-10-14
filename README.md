@@ -68,6 +68,7 @@ Then open http://localhost:3000.
 - To test the safety flow quickly, use the **2-min test run** button (development only) and shorten the grace period: `OVERDUE_GRACE_MINUTES=1 docker compose up -d`.
 - Two people need separate logins to test together: use a normal and a private window, or two browsers.
 - To reset the database: `docker compose down -v && docker compose up -d`.
+- Optional local demo content: any `init_data/zz_local_*.sql` file runs after the sample data and is gitignored, so it can reference personal photos in `uploads/` without them ever being committed.
 
 `server/.env` needs `POSTGRES_HOST=db`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `SESSION_SECRET`, `PORT=5001`, and optionally `EMAIL_USER`, `EMAIL_PASS` and `APP_URL`.
 

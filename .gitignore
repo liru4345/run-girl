@@ -44,3 +44,6 @@ uploads/*
 .vscode/
 *.fileloc
 *.textClipping
+
+# Local demo content with personal photos (never committed)
+init_data/zz_local_*.sql
