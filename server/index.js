@@ -544,12 +544,15 @@ app.get('/api/start-run', async (req, res) => {
 
   try {
     const friends = await db.any(`
-      SELECT u.id, u.first_name, u.last_name, u.profile_picture
+      -- Anyone connected to you in either direction. DISTINCT matters: mutual follows
+      -- match both directions and would otherwise appear twice.
+      SELECT DISTINCT u.id, u.first_name, u.last_name, u.profile_picture
       FROM friends f
-      JOIN users u ON 
-        (u.id = f.friend_id AND f.user_id = $1) OR 
+      JOIN users u ON
+        (u.id = f.friend_id AND f.user_id = $1) OR
         (u.id = f.user_id AND f.friend_id = $1)
       WHERE f.status = 'following'
+      ORDER BY u.first_name, u.last_name
     `, [userId]);
 
     const runDefaults = {
