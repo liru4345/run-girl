@@ -483,12 +483,12 @@ const StartRun = () => {
               )}
             </div>
             <p className="rh-subtle mb-3">
-              Watchers are notified when you head out and alerted if you don't check in on time.
+              Pick from your friends (people you follow who follow you back). They're notified when you head out and alerted if you don't check in on time.
             </p>
 
             {friends.length === 0 ? (
               <div className="text-center rh-subtle py-4">
-                No friends yet. <Link to="/feed">Find friends</Link> to add watchers.
+                No friends yet. Watchers need to follow each other with you. <Link to="/friends">Find friends</Link> to get started.
               </div>
             ) : (
               <div className="d-flex flex-column gap-1" style={{ maxHeight: 420, overflowY: 'auto' }}>

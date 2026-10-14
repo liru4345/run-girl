@@ -537,6 +537,15 @@ app.post('/api/notifications/read-all', async (req, res) => {
 // *****************************************************
 // <!-- Start Run commands -->
 // *****************************************************
+// Mutual friends of user $1: you follow them and they follow you back. Only mutual
+// friends can be watchers, since watchers see your live location and phone number.
+const MUTUAL_FRIENDS_SQL = `
+  SELECT u.id, u.first_name, u.last_name, u.profile_picture
+  FROM friends mine
+  JOIN friends theirs ON theirs.user_id = mine.friend_id AND theirs.friend_id = mine.user_id
+  JOIN users u ON u.id = mine.friend_id
+  WHERE mine.user_id = $1 AND mine.status = 'following' AND theirs.status = 'following'`;
+
 app.get('/api/start-run', async (req, res) => {
   const userId = req.session.user?.id;
 
@@ -544,14 +553,7 @@ app.get('/api/start-run', async (req, res) => {
 
   try {
     const friends = await db.any(`
-      -- Anyone connected to you in either direction. DISTINCT matters: mutual follows
-      -- match both directions and would otherwise appear twice.
-      SELECT DISTINCT u.id, u.first_name, u.last_name, u.profile_picture
-      FROM friends f
-      JOIN users u ON
-        (u.id = f.friend_id AND f.user_id = $1) OR
-        (u.id = f.user_id AND f.friend_id = $1)
-      WHERE f.status = 'following'
+      ${MUTUAL_FRIENDS_SQL}
       ORDER BY u.first_name, u.last_name
     `, [userId]);
 
@@ -614,9 +616,12 @@ app.post('/api/start-run', async (req, res) => {
         RETURNING id
       `, [userId, location, minutes]);
 
-      await t.batch(watcherIds.map(watcherId =>
-        t.none(`INSERT INTO run_watchers (run_id, watcher_id) VALUES ($1, $2)`, [run.id, watcherId])
-      ));
+      // Only mutual friends are added, whatever IDs the browser sent.
+      await t.none(`
+        INSERT INTO run_watchers (run_id, watcher_id)
+        SELECT $2, f.id FROM (${MUTUAL_FRIENDS_SQL}) f
+        WHERE f.id = ANY($3::int[])
+      `, [userId, run.id, watcherIds.map(Number).filter(Number.isInteger)]);
       return run.id;
     });
 
